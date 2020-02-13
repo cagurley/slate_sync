@@ -239,7 +239,8 @@ def main():
   acad_prog text,
   acad_plan text,
   prog_action text,
-  prog_reason text)""")
+  prog_reason text,
+  appl_fee_status text)""")
             lcur.execute("""CREATE TABLE oraaux (
   emplid text,
   acad_career text,
@@ -296,7 +297,8 @@ def main():
   acad_prog text,
   acad_plan text,
   prog_action text,
-  prog_reason text)""")
+  prog_reason text,
+  appl_fee_status text)""")
             lcur.execute('CREATE TABLE oraref1 (acad_prog text, acad_plan text)')
             lcur.execute('CREATE TABLE oraref2 (prog_action text, prog_reason text)')
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
@@ -339,7 +341,8 @@ def main():
   coalesce((select top 1 [value] from dbo.getFieldTopTable(a.[id], 'ug_appl_acad_prog_pending')), (select top 1 [value] from dbo.getFieldTopTable(a.[id], 'ug_appl_acad_prog'))) as [ACAD_PROG],
   coalesce((select top 1 [value] from dbo.getFieldExportTable(a.[id], 'ug_appl_acad_plan_pending')), (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'ug_appl_acad_plan'))) as [ACAD_PLAN],
   (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'prog_action')) as [PROG_ACTION],
-  (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'prog_reason')) as [PROG_REASON]
+  (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'prog_reason')) as [PROG_REASON],
+  (select top 1 [value] from dbo.getFieldTopTable(a.[id], 'appl_fee_status')) as [APPL_FEE_STATUS]
 from [application] a
 inner join [person] p on p.[id] = a.[person]
 inner join [lookup.round] lr on lr.[id] = a.[round]
@@ -354,7 +357,7 @@ order by 1, 2""")
                         if not rows:
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
-                        lcur.executemany('INSERT INTO mssbase VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lcur.executemany('INSERT INTO mssbase VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -379,7 +382,8 @@ order by 1, 2""")
   A.ACAD_PROG,
   A.ACAD_PLAN,
   A.PROG_ACTION,
-  A.PROG_REASON
+  A.PROG_REASON,
+  A.APPL_FEE_STATUS
 FROM PS_L_ADM_PROG_VW A
 WHERE A.ADMIT_TERM BETWEEN :termlb AND :termub
 AND A.ACAD_CAREER = 'UGRD'
@@ -390,7 +394,7 @@ ORDER BY A.EMPLID, A.ADM_APPL_NBR""", qvars['oracle'])
                         if not rows:
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
-                        lcur.executemany('INSERT INTO orabase VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lcur.executemany('INSERT INTO orabase VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -594,6 +598,7 @@ AND (
   OR orb.acad_plan != msb.acad_plan
   OR orb.prog_action != msb.prog_action
   OR orb.prog_reason != msb.prog_reason
+  OR orb.appl_fee_status != msb.appl_fee_status
 )
 ORDER BY 1, 2"""
             ui = """
@@ -639,6 +644,7 @@ ORDER BY 1, 2"""
     OR uorb.acad_plan != umsb.acad_plan
     OR uorb.prog_action != umsb.prog_action
     OR uorb.prog_reason != umsb.prog_reason
+    OR uorb.appl_fee_status != umsb.appl_fee_status
   )
 """
 
@@ -735,6 +741,22 @@ ORDER BY 1, 2""")
                             row_metadata,
                             ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_plan_{}.txt'.format(today.strftime('%Y%m%d'))))
+            lcur.execute("""SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.appl_fee_status != orb.appl_fee_status
+ORDER BY 1, 2""")
+            ldata = query_to_csv(os.path.join(cwd, 'update', 'FEE_STATUS_CHANGE.csv'),
+                                 lcur,
+                                 [0, 1, 9],
+                                 os.path.join(cwd, '.archive', 'FEE_STATUS_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+            query_to_update(os.path.join(cwd, 'update', 'update_fee_status.txt'),
+                            'PS_ADM_APPL_DATA',
+                            ['APPL_FEE_STATUS'],
+                            row_metadata,
+                            ldata,
+                            archivename=os.path.join(cwd, '.archive', 'update_fee_status_{}.txt'.format(today.strftime('%Y%m%d'))),
+                            static_targets=[('APPL_FEE_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
             lcur.execute("""SELECT
   msb.*,
   orb.*,
@@ -776,7 +798,7 @@ AND msb.prog_reason != orb.prog_reason
 ORDER BY 1, 2""")
             ldata = query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
                                  lcur,
-                                 [0, 1, 8, 24, 25],
+                                 [0, 1, 8, 26, 27],
                                  os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
                             'PS_ADM_APPL_PROG',
@@ -840,7 +862,7 @@ AND msb.acad_plan is not null
 ORDER BY 1, 2""")
             ldata = query_to_csv(os.path.join(cwd, 'update', 'ACTION_CHANGE.csv'),
                                  lcur,
-                                 range(19, 58),
+                                 range(21, 60),
                                  os.path.join(cwd, '.archive', 'ACTION_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             if ldata:
                 stmt_groups = []

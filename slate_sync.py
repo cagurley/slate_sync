@@ -883,13 +883,13 @@ ORDER BY 1, 2""")
                             'PS_ADM_APP_CAR_SEQ',
                             sdata,
                             archivename=os.path.join(cwd, '.archive', 'update_dep_calc_needed_{}.txt'.format(today.strftime('%Y%m%d'))),
-                            static_targets=[('DEP_CALC_NEEDED', 'Y')])
+                            static_targets=[('DEP_CALC_NEEDED', '\'Y\'')])
             sdata = filter_rows_by_val(ldata, 2, 'MATR')
             query_to_update(os.path.join(cwd, 'update', 'update_create_prog_status.txt'),
                             'PS_ADM_APP_CAR_SEQ',
                             sdata,
                             archivename=os.path.join(cwd, '.archive', 'update_create_prog_status_{}.txt'.format(today.strftime('%Y%m%d'))),
-                            static_targets=[('CREATE_PROG_STATUS', 'R')])
+                            static_targets=[('CREATE_PROG_STATUS', '\'R\'')])
             if ldata:
                 stmt_groups = []
                 excerpt = ''
@@ -897,7 +897,7 @@ ORDER BY 1, 2""")
                     if (i % 250) == 0 and i > 0:
                         stmt_groups.append(excerpt)
                         excerpt = ''
-                    effseq = (str(row[6] + 1) if dt.datetime.strptime(row[5], '%Y-%m-%d').date() == today.date() else '1')
+                    effseq = (str(row[9] + 1) if dt.datetime.strptime(row[8], '%Y-%m-%d').date() == today.date() else '1')
                     excerpt += '  INTO PS_ADM_APPL_PROG VALUES ({})\n'.format(
                             ', '.join(prep_sql_vals(*row[3:8]))
                             + ', TRUNC(SYSDATE), {}, '.format(effseq)
@@ -914,7 +914,7 @@ ORDER BY 1, 2""")
                             + ', '.join(prep_sql_vals(*row[38:]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
-                    excerpt += '  INTO PS_L_DIRXML ({})\n'.format(*prep_sql_vals(row[0]))
+                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*prep_sql_vals(row[0]))
                 stmt_groups.append(excerpt)
                 while True:
                     try:

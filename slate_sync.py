@@ -36,6 +36,14 @@ def prep_sql_vals(*args):
     return prepped
 
 
+def filter_rows_by_val(iterable, index, value):
+    filtered = []
+    for row in iterable:
+        if row[index] == value:
+            filtered.append(row)
+    return filtered
+
+
 def query_to_csv(filename, cursor, return_indices=None, archivename=None):
     """
     If archivename is supplied, it should be a path string for
@@ -95,21 +103,21 @@ def query_to_csv(filename, cursor, return_indices=None, archivename=None):
 
 def query_to_update(update_filename,
                     update_table,
-                    update_targets,
-                    update_metadata,
                     data,
+                    dynamic_targets=None,
+                    update_metadata=None,
                     where_addendums=[],
                     addendum_decorators=[],
                     archivename=None,
                     static_targets=[]):
-    """The update_targets argument should be a list of strings
-    wherein each is the name of a column to be updated;
-    the data argument should be the return value of query_to_csv
+    """The data argument should be the return value of query_to_csv
     wherein the return_indices supplied were at least three in quantity
     whereby the first referred to the relevant emplid column,
     the second referred to the relevant adm_appl_nbr column,
     the third referenced the column of update source values,
     and the remaining optional indices cohere with the subsequent argument;
+    the optional dynamic_targets argument should be a list of strings
+    wherein each is the name of a column to be updated;
     the optional where_addendums argument should be a list of strings
     wherein the length is equal to the number of return_indices supplied
     to query_to_csv minus three and whereby each string is the name
@@ -152,12 +160,17 @@ def query_to_update(update_filename,
             try:
                 with open(update_filename, 'w') as file:
                     for row in stmt_groups:
-                        stmt = 'UPDATE {}\nSET SCC_ROW_UPD_OPRID = {}, SCC_ROW_UPD_DTTM = {}'.format(update_table, *update_metadata)
+                        stmt = 'UPDATE {}\nSET '.format(update_table)
+                        targets = []
+                        if update_metadata:
+                            targets.append('SCC_ROW_UPD_OPRID = {}, SCC_ROW_UPD_DTTM = {}'.format(*update_metadata))
                         if static_targets:
                             for pair in static_targets:
-                                stmt = ', '.join([stmt, '{} = {}'.format(pair[0], pair[1])])
-                        for target in update_targets:
-                            stmt = ', '.join([stmt, '{} = DECODE(ADM_APPL_NBR, {})'.format(target, row[0])])
+                                targets.append('{} = {}'.format(*pair))
+                        if dynamic_targets:
+                            for target in dynamic_targets:
+                                targets.append('{} = DECODE(ADM_APPL_NBR, {})'.format(target, row[0]))
+                        stmt += ', '.join(targets)
                         stmt += '\nWHERE EMPLID IN ({}) AND ADM_APPL_NBR = DECODE(EMPLID, {})'.format(row[1], row[2])
                         if where_addendums:
                             for wi, addendum in enumerate(where_addendums):
@@ -670,9 +683,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'TYPE_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_type.txt'),
                             'PS_ADM_APPL_DATA',
+                            ldata,
                             ['ADMIT_TYPE'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_type_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
             lcur.execute("""SELECT *
@@ -686,9 +699,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'LEVEL_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_level.txt'),
                             'PS_ADM_APPL_DATA',
+                            ldata,
                             ['ACADEMIC_LEVEL'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_level_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
             lcur.execute("""SELECT *
@@ -702,15 +715,15 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'TERM_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_term_prog.txt'),
                             'PS_ADM_APPL_PROG',
+                            ldata,
                             ['ADMIT_TERM', 'REQ_TERM'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_term_prog_{}.txt'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_term_plan.txt'),
                             'PS_ADM_APPL_PLAN',
+                            ldata,
                             ['REQ_TERM'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_term_plan_{}.txt'.format(today.strftime('%Y%m%d'))))
             lcur.execute("""SELECT *
 FROM mssbase as msb
@@ -723,9 +736,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'PROG_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_prog.txt'),
                             'PS_ADM_APPL_PROG',
+                            ldata,
                             ['ACAD_PROG'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_prog_{}.txt'.format(today.strftime('%Y%m%d'))))
             lcur.execute("""SELECT *
 FROM mssbase as msb
@@ -738,9 +751,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'PLAN_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_plan.txt'),
                             'PS_ADM_APPL_PLAN',
+                            ldata,
                             ['ACAD_PLAN'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_plan_{}.txt'.format(today.strftime('%Y%m%d'))))
             lcur.execute("""SELECT *
 FROM mssbase as msb
@@ -753,9 +766,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'FEE_STATUS_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_fee_status.txt'),
                             'PS_ADM_APPL_DATA',
+                            ldata,
                             ['APPL_FEE_STATUS'],
                             row_metadata,
-                            ldata,
                             archivename=os.path.join(cwd, '.archive', 'update_fee_status_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('APPL_FEE_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
             lcur.execute("""SELECT
@@ -803,9 +816,9 @@ ORDER BY 1, 2""")
                                  os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
                             'PS_ADM_APPL_PROG',
+                            ldata,
                             ['PROG_REASON'],
                             row_metadata,
-                            ldata,
                             ['EFFDT', 'EFFSEQ'],
                             [('TO_DATE(', ', \'YYYY-MM-DD\')'), ('', '')],
                             os.path.join(cwd, '.archive', 'update_reason_{}.txt'.format(today.strftime('%Y%m%d'))))
@@ -863,8 +876,20 @@ AND msb.acad_plan is not null
 ORDER BY 1, 2""")
             ldata = query_to_csv(os.path.join(cwd, 'update', 'ACTION_CHANGE.csv'),
                                  lcur,
-                                 range(21, 60),
+                                 [0, 1, 7, *range(21, 60)],
                                  os.path.join(cwd, '.archive', 'ACTION_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+            sdata = filter_rows_by_val(ldata, 2, 'ADMT')
+            query_to_update(os.path.join(cwd, 'update', 'update_dep_calc_needed.txt'),
+                            'PS_ADM_APP_CAR_SEQ',
+                            sdata,
+                            archivename=os.path.join(cwd, '.archive', 'update_dep_calc_needed_{}.txt'.format(today.strftime('%Y%m%d'))),
+                            static_targets=[('DEP_CALC_NEEDED', 'Y')])
+            sdata = filter_rows_by_val(ldata, 2, 'MATR')
+            query_to_update(os.path.join(cwd, 'update', 'update_create_prog_status.txt'),
+                            'PS_ADM_APP_CAR_SEQ',
+                            sdata,
+                            archivename=os.path.join(cwd, '.archive', 'update_create_prog_status_{}.txt'.format(today.strftime('%Y%m%d'))),
+                            static_targets=[('CREATE_PROG_STATUS', 'R')])
             if ldata:
                 stmt_groups = []
                 excerpt = ''
@@ -874,19 +899,19 @@ ORDER BY 1, 2""")
                         excerpt = ''
                     effseq = (str(row[6] + 1) if dt.datetime.strptime(row[5], '%Y-%m-%d').date() == today.date() else '1')
                     excerpt += '  INTO PS_ADM_APPL_PROG VALUES ({})\n'.format(
-                            ', '.join(prep_sql_vals(*row[0:5]))
+                            ', '.join(prep_sql_vals(*row[3:8]))
                             + ', TRUNC(SYSDATE), {}, '.format(effseq)
-                            + ', '.join(prep_sql_vals(*row[7:11]))
+                            + ', '.join(prep_sql_vals(*row[10:14]))
                             + ', TRUNC(SYSDATE), '
-                            + ', '.join(prep_sql_vals(*row[12:25]))
+                            + ', '.join(prep_sql_vals(*row[15:28]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
                     excerpt += '  INTO PS_ADM_APPL_PLAN VALUES ({})\n'.format(
-                            ', '.join(prep_sql_vals(*row[26:31]))
+                            ', '.join(prep_sql_vals(*row[29:34]))
                             + ', TRUNC(SYSDATE), {}, '.format(effseq)
-                            + ', '.join(prep_sql_vals(row[33]))
+                            + ', '.join(prep_sql_vals(row[36]))
                             + ', TO_DATE({}, \'YYYY-MM-DD\'), '.format(*prep_sql_vals(row[34]))
-                            + ', '.join(prep_sql_vals(*row[35:]))
+                            + ', '.join(prep_sql_vals(*row[38:]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
                     excerpt += '  INTO PS_L_DIRXML ({})\n'.format(*prep_sql_vals(row[0]))
@@ -902,6 +927,30 @@ ORDER BY 1, 2""")
                     except OSError as e:
                         print(str(e))
                         input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
+            lcur.execute("""SELECT
+  msb.*,
+  orb.*
+FROM mssbase as msb
+INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.prog_action != orb.prog_action
+AND msb.admit_term is not null
+AND msb.acad_prog is not null
+AND msb.acad_plan is not null
+AND msb.prog_action = 'ADMT'
+ORDER BY 1, 2""")
+            lcur.execute("""SELECT
+  msb.*,
+  orb.*
+FROM mssbase as msb
+INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.prog_action != orb.prog_action
+AND msb.admit_term is not null
+AND msb.acad_prog is not null
+AND msb.acad_plan is not null
+AND msb.prog_action = 'MATR'
+ORDER BY 1, 2""")
 
             # Cleanup local database
             lcur.execute('DROP TABLE IF EXISTS orabase')

@@ -889,6 +889,7 @@ ORDER BY 1, 2""")
                             + ', '.join(prep_sql_vals(*row[35:]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
+                    excerpt += '  INTO PS_L_DIRXML ({})\n'.format(*prep_sql_vals(row[0]))
                 stmt_groups.append(excerpt)
                 while True:
                     try:

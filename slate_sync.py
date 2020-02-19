@@ -343,13 +343,14 @@ def main():
   (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'prog_action')) as [PROG_ACTION],
   (select top 1 [value] from dbo.getFieldExportTable(a.[id], 'prog_reason')) as [PROG_REASON],
   (select top 1 [value] from dbo.getFieldTopTable(a.[id], 'appl_fee_status')) as [APPL_FEE_STATUS]
-from [application] a
-inner join [person] p on p.[id] = a.[person]
-inner join [lookup.round] lr on lr.[id] = a.[round]
+from [application] as a
+inner join [person] as p on a.[person] = p.[id]
+inner join [lookup.round] as lr on a.[round] = lr.[id]
+inner join [lookup.period] as lp on lr.[period] = lp.[id]
 where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
-and isnull(lr.[key], '') = 'UG'
+and lr.[key] = 'UG'
 and a.[submitted] is not null
-and lr.[active] = 1
+and lp.[active] = 1
 order by 1, 2""")
                     fc = 0
                     while True:

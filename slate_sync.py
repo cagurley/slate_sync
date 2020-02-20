@@ -893,6 +893,7 @@ ORDER BY 1, 2""")
             if ldata:
                 stmt_groups = []
                 excerpt = ''
+                ids = set()
                 for i, row in enumerate(ldata):
                     if (i % 250) == 0 and i > 0:
                         stmt_groups.append(excerpt)
@@ -914,7 +915,14 @@ ORDER BY 1, 2""")
                             + ', '.join(prep_sql_vals(*row[38:]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
-                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*prep_sql_vals(row[0]))
+                    ids.add(row[0])
+                stmt_groups.append(excerpt)
+                excerpt = ''
+                for i, member in enumerate(ids):
+                    if (i % 500) == 0 and i > 0:
+                        stmt_groups.append(excerpt)
+                        excerpt = ''
+                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*prep_sql_vals(member))
                 stmt_groups.append(excerpt)
                 while True:
                     try:

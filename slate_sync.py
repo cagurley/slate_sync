@@ -361,7 +361,7 @@ inner join [person] as p on a.[person] = p.[id]
 inner join [lookup.round] as lr on a.[round] = lr.[id]
 inner join [lookup.period] as lp on lr.[period] = lp.[id]
 where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
-and lr.[key] = 'UG'
+and lr.[key] != 'GR'
 and a.[submitted] is not null
 and lp.[active] = 1
 order by 1, 2""")

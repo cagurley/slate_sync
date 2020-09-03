@@ -237,7 +237,7 @@ def main():
             # Setup local database
             lcur = lconn.cursor()
             lcur.execute('DROP TABLE IF EXISTS orabase')
-            lcur.execute('DROP TABLE IF EXISTS oraaux')
+            lcur.execute('DROP TABLE IF EXISTS oraaux1')
             lcur.execute('DROP TABLE IF EXISTS mssbase')
             lcur.execute('DROP TABLE IF EXISTS oraref1')
             lcur.execute('DROP TABLE IF EXISTS oraref2')
@@ -254,7 +254,7 @@ def main():
   prog_action text,
   prog_reason text,
   appl_fee_status text)""")
-            lcur.execute("""CREATE TABLE oraaux (
+            lcur.execute("""CREATE TABLE oraaux1 (
   emplid text,
   acad_career text,
   stdnt_car_nbr int,
@@ -317,7 +317,7 @@ def main():
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
             lconn.commit()
             lcur.execute('CREATE INDEX orab ON orabase (emplid, adm_appl_nbr)')
-            lcur.execute('CREATE INDEX orax ON oraaux (emplid, adm_appl_nbr)')
+            lcur.execute('CREATE INDEX orax ON oraaux1 (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX ssb ON mssbase (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX orar1 ON oraref1 (acad_prog, acad_plan)')
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
@@ -488,7 +488,7 @@ ORDER BY A.EMPLID, A.ADM_APPL_NBR""", qvars['oracle'])
                         if not rows:
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
-                        lcur.executemany('INSERT INTO oraaux VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lcur.executemany('INSERT INTO oraaux1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -775,38 +775,38 @@ ORDER BY 1, 2""")
   msb.*,
   orb.*,
   '' as [BREAK],
-  orx.emplid,
-  orx.acad_career,
-  orx.stdnt_car_nbr,
-  orx.adm_appl_nbr,
-  orx.appl_prog_nbr,
-  orx.effdt,
-  orx.effseq,
-  orx.institution,
-  orx.acad_prog,
-  orx.prog_status,
-  orx.prog_action,
-  orx.action_dt,
-  orx.prog_reason,
-  orx.admit_term,
-  orx.exp_grad_term,
-  orx.req_term,
-  orx.acad_load_appr,
-  orx.campus,
-  orx.acad_prog_dual,
-  orx.joint_prog_appr,
-  orx.ssr_rs_candit_nbr,
-  orx.ssr_apt_instance,
-  orx.ssr_yr_of_prog,
-  orx.ssr_shift,
-  orx.ssr_cohort_id,
-  orx.scc_row_add_oprid,
-  orx.scc_row_add_dttm,
-  orx.scc_row_upd_oprid,
-  orx.scc_row_upd_dttm
+  orx1.emplid,
+  orx1.acad_career,
+  orx1.stdnt_car_nbr,
+  orx1.adm_appl_nbr,
+  orx1.appl_prog_nbr,
+  orx1.effdt,
+  orx1.effseq,
+  orx1.institution,
+  orx1.acad_prog,
+  orx1.prog_status,
+  orx1.prog_action,
+  orx1.action_dt,
+  orx1.prog_reason,
+  orx1.admit_term,
+  orx1.exp_grad_term,
+  orx1.req_term,
+  orx1.acad_load_appr,
+  orx1.campus,
+  orx1.acad_prog_dual,
+  orx1.joint_prog_appr,
+  orx1.ssr_rs_candit_nbr,
+  orx1.ssr_apt_instance,
+  orx1.ssr_yr_of_prog,
+  orx1.ssr_shift,
+  orx1.ssr_cohort_id,
+  orx1.scc_row_add_oprid,
+  orx1.scc_row_add_dttm,
+  orx1.scc_row_upd_oprid,
+  orx1.scc_row_upd_dttm
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-INNER JOIN oraaux as orx on orb.emplid = orx.emplid and orb.adm_appl_nbr = orx.adm_appl_nbr
+INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.prog_action = orb.prog_action
 AND msb.prog_reason != orb.prog_reason
 ORDER BY 1, 2""")
@@ -826,49 +826,49 @@ ORDER BY 1, 2""")
   msb.*,
   orb.*,
   '' as [BREAK],
-  orx.emplid,
-  orx.acad_career,
-  orx.stdnt_car_nbr,
-  orx.adm_appl_nbr,
-  orx.appl_prog_nbr,
-  orx.effdt,
-  orx.effseq,
-  orx.institution,
+  orx1.emplid,
+  orx1.acad_career,
+  orx1.stdnt_car_nbr,
+  orx1.adm_appl_nbr,
+  orx1.appl_prog_nbr,
+  orx1.effdt,
+  orx1.effseq,
+  orx1.institution,
   msb.acad_prog,
   orr3.prog_status,
   msb.prog_action,
   '',
   msb.prog_reason,
   msb.admit_term,
-  orx.exp_grad_term,
+  orx1.exp_grad_term,
   msb.admit_term,
-  orx.acad_load_appr,
-  orx.campus,
-  orx.acad_prog_dual,
-  orx.joint_prog_appr,
-  orx.ssr_rs_candit_nbr,
-  orx.ssr_apt_instance,
-  orx.ssr_yr_of_prog,
-  orx.ssr_shift,
-  orx.ssr_cohort_id,
+  orx1.acad_load_appr,
+  orx1.campus,
+  orx1.acad_prog_dual,
+  orx1.joint_prog_appr,
+  orx1.ssr_rs_candit_nbr,
+  orx1.ssr_apt_instance,
+  orx1.ssr_yr_of_prog,
+  orx1.ssr_shift,
+  orx1.ssr_cohort_id,
   '' as [BREAK],
-  orx.Xemplid,
-  orx.Xacad_career,
-  orx.Xstdnt_car_nbr,
-  orx.Xadm_appl_nbr,
-  orx.Xappl_prog_nbr,
-  orx.Xeffdt,
-  orx.Xeffseq,
+  orx1.Xemplid,
+  orx1.Xacad_career,
+  orx1.Xstdnt_car_nbr,
+  orx1.Xadm_appl_nbr,
+  orx1.Xappl_prog_nbr,
+  orx1.Xeffdt,
+  orx1.Xeffseq,
   msb.acad_plan,
-  orx.Xdeclare_dt,
-  orx.Xplan_sequence,
+  orx1.Xdeclare_dt,
+  orx1.Xplan_sequence,
   msb.admit_term,
-  orx.Xssr_apt_instance,
-  orx.Xssr_yr_of_prog
+  orx1.Xssr_apt_instance,
+  orx1.Xssr_yr_of_prog
 FROM mssbase as msb
 INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-INNER JOIN oraaux as orx on orb.emplid = orx.emplid and orb.adm_appl_nbr = orx.adm_appl_nbr
+INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.prog_action != orb.prog_action
 AND msb.admit_term is not null
 AND msb.acad_prog is not null
@@ -961,12 +961,12 @@ AND msb.prog_action = 'MATR'
 ORDER BY 1, 2""")
 
             # Cleanup local database
-            lcur.execute('DROP TABLE IF EXISTS orabase')
-            lcur.execute('DROP TABLE IF EXISTS oraaux')
-            lcur.execute('DROP TABLE IF EXISTS mssbase')
-            lcur.execute('DROP TABLE IF EXISTS oraref1')
-            lcur.execute('DROP TABLE IF EXISTS oraref2')
-            lcur.execute('DROP TABLE IF EXISTS oraref3')
+            # lcur.execute('DROP TABLE IF EXISTS orabase')
+            # lcur.execute('DROP TABLE IF EXISTS oraaux1')
+            # lcur.execute('DROP TABLE IF EXISTS mssbase')
+            # lcur.execute('DROP TABLE IF EXISTS oraref1')
+            # lcur.execute('DROP TABLE IF EXISTS oraref2')
+            # lcur.execute('DROP TABLE IF EXISTS oraref3')
             lconn.commit()
         except (pyodbc.DatabaseError) as e:
             conn.close()
@@ -977,7 +977,7 @@ ORDER BY 1, 2""")
             lconn.rollback()
             lcur.close()
             lconn.close()
-            os.remove(localdb)
+            # os.remove(localdb)
     finally:
         input('Press enter to finish...')
 

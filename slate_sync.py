@@ -238,6 +238,7 @@ def main():
             lcur = lconn.cursor()
             lcur.execute('DROP TABLE IF EXISTS orabase')
             lcur.execute('DROP TABLE IF EXISTS oraaux1')
+            lcur.execute('DROP TABLE IF EXISTS oraaux2')
             lcur.execute('DROP TABLE IF EXISTS mssbase')
             lcur.execute('DROP TABLE IF EXISTS oraref1')
             lcur.execute('DROP TABLE IF EXISTS oraref2')
@@ -301,6 +302,30 @@ def main():
   Xscc_row_add_dttm text,
   Xscc_row_upd_oprid text,
   Xscc_row_upd_dttm text)""")
+            lcur.execute("""CREATE TABLE oraaux2 (
+  emplid text,
+  name_prefix text,
+  first_name int,
+  middle_name text,
+  last_name int,
+  name_suffix text,
+  home_phone text,
+  cell_phone text,
+  phone_pref text,
+  other_email text,
+  email_pref text,
+  home_country text,
+  home_street text,
+  home_city text,
+  home_county text,
+  home_state text,
+  home_postal text,
+  mail_country text,
+  mail_street text,
+  mail_city text,
+  mail_county text,
+  mail_state text,
+  mail_postal text)""")
             lcur.execute("""CREATE TABLE mssbase (
   emplid text,
   adm_appl_nbr text,
@@ -317,7 +342,8 @@ def main():
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
             lconn.commit()
             lcur.execute('CREATE INDEX orab ON orabase (emplid, adm_appl_nbr)')
-            lcur.execute('CREATE INDEX orax ON oraaux1 (emplid, adm_appl_nbr)')
+            lcur.execute('CREATE INDEX orax1 ON oraaux1 (emplid, adm_appl_nbr)')
+            lcur.execute('CREATE INDEX orax2 ON oraaux2 (emplid)')
             lcur.execute('CREATE INDEX ssb ON mssbase (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX orar1 ON oraref1 (acad_prog, acad_plan)')
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
@@ -489,6 +515,73 @@ ORDER BY A.EMPLID, A.ADM_APPL_NBR""", qvars['oracle'])
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
                         lcur.executemany('INSERT INTO oraaux1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lconn.commit()
+                        print(f'Fetched and inserted from row {fc*500 + 1}...')
+                        fc += 1
+                    cur.execute("""SELECT DISTINCT
+  A.EMPLID,
+  B.NAME_PREFIX,
+  B.FIRST_NAME,
+  B.MIDDLE_NAME,
+  B.LAST_NAME,
+  B.NAME_SUFFIX,
+  (CASE WHEN C.PHONE_TYPE IS NOT NULL THEN ('+' || REGEXP_SUBSTR(C.COUNTRY_CODE, '[1-9]*$') ||  ' ' || REGEXP_REPLACE(C.PHONE, '[\/-]')) END) AS "HOME_PHONE",
+  (CASE WHEN D.PHONE_TYPE IS NOT NULL THEN ('+' || REGEXP_SUBSTR(D.COUNTRY_CODE, '[1-9]*$') ||  ' ' || REGEXP_REPLACE(D.PHONE, '[\/-]')) END) AS "CELL_PHONE",
+  E.PHONE_TYPE AS "PHONE_PREF",
+  F.EMAIL_ADDR AS "OTHER_EMAIL",
+  G.E_ADDR_TYPE AS "EMAIL_PREF",
+  H.COUNTRY AS "HOME_COUNTRY",
+  H.ADDRESS1 AS "HOME_STREET",
+  H.CITY AS "HOME_CITY",
+  H.COUNTY AS "HOME_COUNTY",
+  H.STATE AS "HOME_STATE",
+  H.POSTAL AS "HOME_POSTAL",
+  I.COUNTRY AS "MAIL_COUNTRY",
+  I.ADDRESS1 AS "MAIL_STREET",
+  I.CITY AS "MAIL_CITY",
+  I.COUNTY AS "MAIL_COUNTY",
+  I.STATE AS "MAIL_STATE",
+  I.POSTAL AS "MAIL_POSTAL"
+FROM PS_L_ADM_PROG_VW A
+LEFT OUTER JOIN PS_NAMES B ON A.EMPLID = B.EMPLID AND B.NAME_TYPE = 'PRF' AND B.EFFDT = (
+    SELECT MAX(B_ED.EFFDT)
+    FROM PS_NAMES B_ED
+    WHERE B.EMPLID = B_ED.EMPLID
+    AND B.NAME_TYPE = B_ED.NAME_TYPE
+  ) AND B.EFF_STATUS = 'A'
+LEFT OUTER JOIN PS_PERSONAL_PHONE C ON A.EMPLID = C.EMPLID AND C.PHONE_TYPE = 'HOME'
+LEFT OUTER JOIN PS_PERSONAL_PHONE D ON A.EMPLID = D.EMPLID AND D.PHONE_TYPE = 'CELL'
+LEFT OUTER JOIN PS_PERSONAL_PHONE E ON A.EMPLID = E.EMPLID AND E.PREF_PHONE_FLAG = 'Y'
+LEFT OUTER JOIN PS_EMAIL_ADDRESSES F ON A.EMPLID = F.EMPLID AND F.E_ADDR_TYPE = 'OTHR'
+LEFT OUTER JOIN PS_EMAIL_ADDRESSES G ON A.EMPLID = G.EMPLID AND G.PREF_EMAIL_FLAG = 'Y'
+LEFT OUTER JOIN PS_ADDRESSES H ON A.EMPLID = H.EMPLID AND H.ADDRESS_TYPE = 'HOME' AND H.EFFDT = (
+  SELECT MAX(H_ED.EFFDT)
+  FROM PS_ADDRESSES H_ED
+  WHERE H.EMPLID = H_ED.EMPLID
+  AND H.ADDRESS_TYPE = H_ED.ADDRESS_TYPE
+)
+LEFT OUTER JOIN PS_ADDRESSES I ON A.EMPLID = I.EMPLID AND I.ADDRESS_TYPE = 'MAIL' AND I.EFFDT = (
+  SELECT MAX(I_ED.EFFDT)
+  FROM PS_ADDRESSES I_ED
+  WHERE I.EMPLID = I_ED.EMPLID
+  AND I.ADDRESS_TYPE = I_ED.ADDRESS_TYPE
+)
+WHERE NOT EXISTS (
+  SELECT *
+  FROM PS_L_ADM_PROG_VW XA
+  WHERE A.EMPLID = XA.EMPLID
+  AND XA.PROG_ACTION = 'MATR'
+)
+AND A.ADMIT_TERM BETWEEN :termlb AND :termub
+AND A.ACAD_CAREER = 'UGRD'
+ORDER BY A.EMPLID""", qvars['oracle'])
+                    fc = 0
+                    while True:
+                        rows = cur.fetchmany(500)
+                        if not rows:
+                            print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
+                            break
+                        lcur.executemany('INSERT INTO oraaux2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -963,6 +1056,7 @@ ORDER BY 1, 2""")
             # Cleanup local database
             # lcur.execute('DROP TABLE IF EXISTS orabase')
             # lcur.execute('DROP TABLE IF EXISTS oraaux1')
+            # lcur.execute('DROP TABLE IF EXISTS oraaux2')
             # lcur.execute('DROP TABLE IF EXISTS mssbase')
             # lcur.execute('DROP TABLE IF EXISTS oraref1')
             # lcur.execute('DROP TABLE IF EXISTS oraref2')

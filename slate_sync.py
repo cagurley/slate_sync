@@ -423,7 +423,7 @@ order by 1, 2""")
                         fc += 1
                     lcur.execute("UPDATE mssbase SET prog_reason = ' ' WHERE prog_reason IS NULL")
                     lconn.commit()
-                    cur.execute("""select
+                    cur.execute("""select distinct
   (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID],
   p.[preferred] as [PREFERRED],
   p.[phone] as [PRIMARY_PHONE],

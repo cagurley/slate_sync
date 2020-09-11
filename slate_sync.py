@@ -240,6 +240,7 @@ def main():
             lcur.execute('DROP TABLE IF EXISTS oraaux1')
             lcur.execute('DROP TABLE IF EXISTS oraaux2')
             lcur.execute('DROP TABLE IF EXISTS mssbase')
+            lcur.execute('DROP TABLE IF EXISTS mssaux1')
             lcur.execute('DROP TABLE IF EXISTS oraref1')
             lcur.execute('DROP TABLE IF EXISTS oraref2')
             lcur.execute('DROP TABLE IF EXISTS oraref3')
@@ -329,14 +330,32 @@ def main():
             lcur.execute("""CREATE TABLE mssbase (
   emplid text,
   adm_appl_nbr text,
-  admit_type,
-  academic_level,
-  admit_term,
+  admit_type text,
+  academic_level text,
+  admit_term text,
   acad_prog text,
   acad_plan text,
   prog_action text,
   prog_reason text,
   appl_fee_status text)""")
+            lcur.execute("""CREATE TABLE mssaux1 (
+  emplid text,
+  preferred text,
+  primary_phone text,
+  mobile_phone text,
+  email text,
+  permanent_country text,
+  permanent_street text,
+  permanent_city text,
+  permanent_county text,
+  permanent_region text,
+  permanent_postal text,
+  mailing_country text,
+  mailing_street text,
+  mailing_city text,
+  mailing_county text,
+  mailing_region text,
+  mailing_postal text)""")
             lcur.execute('CREATE TABLE oraref1 (acad_prog text, acad_plan text)')
             lcur.execute('CREATE TABLE oraref2 (prog_action text, prog_reason text)')
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
@@ -344,7 +363,8 @@ def main():
             lcur.execute('CREATE INDEX orab ON orabase (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX orax1 ON oraaux1 (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX orax2 ON oraaux2 (emplid)')
-            lcur.execute('CREATE INDEX ssb ON mssbase (emplid, adm_appl_nbr)')
+            lcur.execute('CREATE INDEX mssb ON mssbase (emplid, adm_appl_nbr)')
+            lcur.execute('CREATE INDEX mssx1 ON mssaux1 (emplid)')
             lcur.execute('CREATE INDEX orar1 ON oraref1 (acad_prog, acad_plan)')
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
             lcur.execute('CREATE INDEX orar3 ON oraref3 (prog_status, prog_action)')
@@ -403,6 +423,45 @@ order by 1, 2""")
                         fc += 1
                     lcur.execute("UPDATE mssbase SET prog_reason = ' ' WHERE prog_reason IS NULL")
                     lconn.commit()
+                    cur.execute("""select
+  (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID],
+  p.[preferred] as [PREFERRED],
+  p.[phone] as [PRIMARY_PHONE],
+  p.[mobile] as [MOBILE_PHONE],
+  p.[email] as [EMAIL],
+  pad.[country] as [PERMANENT_COUNTRY],
+  pad.[street] as [PERMANENT_STREET],
+  pad.[city] as [PERMANENT_CITY],
+  pad.[county] as [PERMANENT_COUNTY],
+  pad.[region] as [PERMANENT_REGION],
+  pad.[postal] as [PERMANENT_POSTAL],
+  mad.[country] as [MAILING_COUNTRY],
+  mad.[street] as [MAILING_STREET],
+  mad.[city] as [MAILING_CITY],
+  mad.[county] as [MAILING_COUNTY],
+  mad.[region] as [MAILING_REGION],
+  mad.[postal] as [MAILING_POSTAL]
+from [application] as a
+inner join [person] as p on a.[person] = p.[id]
+inner join [lookup.round] as lr on a.[round] = lr.[id]
+inner join [lookup.period] as lp on lr.[period] = lp.[id]
+left outer join [address] as pad on a.[person] = pad.[record] and pad.[type] = 'permanent' and pad.[rank] = 1
+left outer join [address] as mad on a.[person] = mad.[record] and mad.[type] is null and mad.[rank] = 1
+where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
+and lr.[key] != 'GR'
+and a.[submitted] is not null
+and lp.[active] = 1
+order by 1""")
+                    fc = 0
+                    while True:
+                        rows = cur.fetchmany(500)
+                        if not rows:
+                            print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
+                            break
+                        lcur.executemany('INSERT INTO mssaux1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lconn.commit()
+                        print(f'Fetched and inserted from row {fc*500 + 1}...')
+                        fc += 1
             conn.close()
 
             # Retrieve data from Oracle database
@@ -1064,6 +1123,7 @@ ORDER BY 1, 2""")
             # lcur.execute('DROP TABLE IF EXISTS oraaux1')
             # lcur.execute('DROP TABLE IF EXISTS oraaux2')
             # lcur.execute('DROP TABLE IF EXISTS mssbase')
+            # lcur.execute('DROP TABLE IF EXISTS mssaux1')
             # lcur.execute('DROP TABLE IF EXISTS oraref1')
             # lcur.execute('DROP TABLE IF EXISTS oraref2')
             # lcur.execute('DROP TABLE IF EXISTS oraref3')

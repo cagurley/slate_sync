@@ -1118,6 +1118,71 @@ AND msb.acad_plan is not null
 AND msb.prog_action = 'MATR'
 ORDER BY 1, 2""")
 
+            # Auxiliary queries
+            lcur.execute("""SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.preferred is not null
+ORDER BY 1""")
+            with TemporaryFile('r+', newline='') as tfile:
+                twriter = csv.writer(tfile)
+                header = []
+                for row in lcur.description:
+                    if len(row) > 0:
+                        header.append(row[0])
+                twriter.writerow(header)
+                counter = 0
+                while True:
+                    frows = lcur.fetchmany(500)
+                    if not frows:
+                        print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
+                        break
+                    print(f'Fetched and wrote from row {counter*500 + 1}...')
+                    counter += 1
+                    # Filter for non-ASCII characters
+                    ffrows = []
+                    for row in frows:
+                        for letter in row[1]:
+                            if ord(letter) > 127:
+                                ffrows.append(row)
+                                break;
+                    twriter.writerows(ffrows)
+                write_perm = False
+                tfile.seek(0)
+                treader = csv.reader(tfile)
+                for i, row in enumerate(treader):
+                    if i == 1:
+                        write_perm = True
+                        break
+                if write_perm:
+                    tfile.seek(0)
+                    while True:
+                        try:
+                            with open(os.path.join(cwd, 'audit', 'NONASCII_PREFERRED.csv'), 'w', newline='') as file:
+                                file.write(tfile.read())
+                            break
+                        except OSError as e:
+                            print(str(e))
+                            input('Ensure that the file or directory is not open or locked, then press enter to try again.')
+            lcur.execute("""SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.preferred != orx2.preferred_name
+OR (msx1.preferred is not null and orx2.preferred_name is null)
+ORDER BY 1""")
+            # ldata = query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
+            #                      lcur,
+            #                      [0, 1, 8, 26, 27],
+            #                      os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+            # query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
+            #                 'PS_ADM_APPL_PROG',
+            #                 ldata,
+            #                 ['PROG_REASON'],
+            #                 row_metadata,
+            #                 ['EFFDT', 'EFFSEQ'],
+            #                 [('TO_DATE(', ', \'YYYY-MM-DD\')'), ('', '')],
+            #                 os.path.join(cwd, '.archive', 'update_reason_{}.txt'.format(today.strftime('%Y%m%d'))))
+
             # Cleanup local database
             # lcur.execute('DROP TABLE IF EXISTS orabase')
             # lcur.execute('DROP TABLE IF EXISTS oraaux1')

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Nov  8 10:58:37 2019
-
-@author: cagurl01
+Main module
 """
 
 from tempfile import TemporaryFile
@@ -14,176 +12,7 @@ import os
 import pyodbc
 import shutil
 import sqlite3
-
-
-def validate_keys(srcdict, keys=tuple()):
-    for key in keys:
-        if key not in srcdict:
-            return False
-    for key in srcdict:
-        if key not in keys:
-            return False
-    return True
-
-
-def prep_sql_vals(*args):
-    prepped = []
-    for value in args:
-        if isinstance(value, str):
-            prepped.append('\'' + value + '\'')
-        else:
-            prepped.append(str(value))
-    return prepped
-
-
-def filter_rows_by_val(iterable, index, value):
-    filtered = []
-    for row in iterable:
-        if row[index] == value:
-            filtered.append(row)
-    return filtered
-
-
-def query_to_csv(filename, cursor, return_indices=None, archivename=None):
-    """
-    If archivename is supplied, it should be a path string for
-    an "archived" copy of the file.
-    """
-    return_data = []
-    with TemporaryFile('r+', newline='') as tfile:
-        twriter = csv.writer(tfile)
-        header = []
-        should_return = False
-        for row in cursor.description:
-            if len(row) > 0:
-                header.append(row[0])
-        twriter.writerow(header)
-        if return_indices:
-            for index in return_indices:
-                if len(header) >= index:
-                    should_return = True
-
-        counter = 0
-        while True:
-            frows = cursor.fetchmany(500)
-            if not frows:
-                print(f'\nFetched and wrote {cursor.rowcount} total rows.\n\n')
-                break
-            print(f'Fetched and wrote from row {counter*500 + 1}...')
-            counter += 1
-            twriter.writerows(frows)
-            if should_return:
-                for row in frows:
-                    return_row = []
-                    for index in return_indices:
-                        return_row.append(row[index])
-                    return_data.append(return_row)
-
-        write_perm = False
-        tfile.seek(0)
-        treader = csv.reader(tfile)
-        for i, row in enumerate(treader):
-            if i == 1:
-                write_perm = True
-                break
-        if write_perm:
-            tfile.seek(0)
-            while True:
-                try:
-                    with open(filename, 'w', newline='') as file:
-                        file.write(tfile.read())
-                    if archivename:
-                        shutil.copyfile(filename, archivename)
-                    break
-                except OSError as e:
-                    print(str(e))
-                    input('Ensure that the file or directory is not open or locked, then press enter to try again.')
-    return return_data
-
-
-def query_to_update(update_filename,
-                    update_table,
-                    data,
-                    dynamic_targets=None,
-                    update_metadata=None,
-                    where_addendums=[],
-                    addendum_decorators=[],
-                    archivename=None,
-                    static_targets=[]):
-    """The data argument should be the return value of query_to_csv
-    wherein the return_indices supplied were at least three in quantity
-    whereby the first referred to the relevant emplid column,
-    the second referred to the relevant adm_appl_nbr column,
-    the third referenced the column of update source values,
-    and the remaining optional indices cohere with the subsequent argument;
-    the optional dynamic_targets argument should be a list of strings
-    wherein each is the name of a column to be updated;
-    the optional where_addendums argument should be a list of strings
-    wherein the length is equal to the number of return_indices supplied
-    to query_to_csv minus three and whereby each string is the name
-    of an additional column to be used in the where clause;
-    the optional addendum_decorators argument should be a list of
-    two-string tuples wherein the length of addendum_decorators equals
-    the length of where_addendums and whereby the first argument in each tuple
-    is the prefix for the corresponding where_addendums argument and the second
-    argument is the postfix; the optional static_targets argument should be
-    a list of string two-tuples wherein the first element is a column name to be
-    updated and the second element is the update value."""
-    if data and len(data[0]) >= 3 and (
-            not where_addendums
-            or not addendum_decorators
-            or len(where_addendums) == len(addendum_decorators)):
-        stmt_groups = []
-        excerpts = []
-        while len(excerpts) < (len(where_addendums) + 3):
-            excerpts.append('')
-        for i, row in enumerate(data):
-            if (i % 500) == 0 and i > 0:
-                stmt_groups.append(excerpts.copy())
-                ei = 0
-                while ei < len(excerpts):
-                    excerpts[ei] = ''
-                    ei += 1
-            excerpts[0] += ('\n  \'' + row[1] + '\', \'' + row[2] + '\',')
-            excerpts[1] += ('\n  \'' + row[0] + '\',')
-            excerpts[2] += ('\n  \'' + row[0] + '\', \'' + row[1] + '\',')
-            for (wi, addendum) in enumerate(where_addendums):
-                dvalue = prep_sql_vals(row[wi + 3])[0]
-                if addendum_decorators:
-                    dvalue = addendum_decorators[wi][0] + dvalue + addendum_decorators[wi][1]
-                excerpts[wi + 3] += ('\n  \'' + row[1] + '\', ' + dvalue + ',')
-        stmt_groups.append(excerpts)
-        for row in stmt_groups:
-            for i, string in enumerate(row):
-                row[i] = string.rstrip(',') + '\n'
-        while True:
-            try:
-                with open(update_filename, 'w') as file:
-                    for row in stmt_groups:
-                        stmt = 'UPDATE {}\nSET '.format(update_table)
-                        targets = []
-                        if update_metadata:
-                            targets.append('SCC_ROW_UPD_OPRID = {}, SCC_ROW_UPD_DTTM = {}'.format(*update_metadata))
-                        if static_targets:
-                            for pair in static_targets:
-                                targets.append('{} = {}'.format(*pair))
-                        if dynamic_targets:
-                            for target in dynamic_targets:
-                                targets.append('{} = DECODE(ADM_APPL_NBR, {})'.format(target, row[0]))
-                        stmt += ', '.join(targets)
-                        stmt += '\nWHERE EMPLID IN ({}) AND ADM_APPL_NBR = DECODE(EMPLID, {})'.format(row[1], row[2])
-                        if where_addendums:
-                            for wi, addendum in enumerate(where_addendums):
-                                stmt += ' AND {} = DECODE(ADM_APPL_NBR, {})'.format(addendum, row[wi + 3])
-                        stmt += ';\n'
-                        file.write(stmt)
-                if archivename:
-                    shutil.copyfile(update_filename, archivename)
-                break
-            except OSError as e:
-                print(str(e))
-                input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
-    return None
+import func
 
 
 def main():
@@ -208,21 +37,21 @@ def main():
             connop = json.load(file)
         with open(os.path.join(root, 'qvars.json')) as file:
             qvars = json.load(file)
-        if not (validate_keys(connop, ('oracle', 'sqlserver'))
-                and validate_keys(connop['sqlserver'],
+        if not (func.validate_keys(connop, ('oracle', 'sqlserver'))
+                and func.validate_keys(connop['sqlserver'],
                                   ('driver',
                                    'host',
                                    'database',
                                    'user',
                                    'password'))
-                and validate_keys(connop['oracle'],
+                and func.validate_keys(connop['oracle'],
                                   ('user',
                                    'password',
                                    'host',
                                    'port',
                                    'service_name'))
-                and validate_keys(qvars, ('oracle',))
-                and validate_keys(qvars['oracle'], ('termlb', 'termub'))):
+                and func.validate_keys(qvars, ('oracle',))
+                and func.validate_keys(qvars['oracle'], ('termlb', 'termub'))):
             raise KeyError('JSON files malformed; refer to README.')
         for tdir in ['audit', 'update', '.archive']:
             testdir = os.path.join(cwd, tdir)
@@ -821,13 +650,13 @@ ORDER BY 1, 2"""
 """
 
             lcur.execute(ippc)
-            query_to_csv(os.path.join(cwd, 'audit', 'INVALID_PP_COMBO.csv'), lcur)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'INVALID_PP_COMBO.csv'), lcur)
             lcur.execute(iarc)
-            query_to_csv(os.path.join(cwd, 'audit', 'INVALID_AR_COMBO.csv'), lcur)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'INVALID_AR_COMBO.csv'), lcur)
             lcur.execute(iau)
-            query_to_csv(os.path.join(cwd, 'audit', 'INVALID_ACTION_UPDATE.csv'), lcur)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'INVALID_ACTION_UPDATE.csv'), lcur)
             lcur.execute(cla)
-            query_to_csv(os.path.join(cwd, 'audit', 'CHANGES_TO_LOCKED_APPLICATIONS.csv'), lcur)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'CHANGES_TO_LOCKED_APPLICATIONS.csv'), lcur)
 
             lcur.execute("""SELECT *
 FROM mssbase as msb
@@ -835,11 +664,11 @@ INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.admit_type != orb.admit_type
 AND orb.admit_type != 'XRE'
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'TYPE_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'TYPE_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 2],
                                  os.path.join(cwd, '.archive', 'TYPE_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_type.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_type.txt'),
                             'PS_ADM_APPL_DATA',
                             ldata,
                             ['ADMIT_TYPE'],
@@ -851,11 +680,11 @@ FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.academic_level != orb.academic_level
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'LEVEL_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'LEVEL_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 3],
                                  os.path.join(cwd, '.archive', 'LEVEL_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_level.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_level.txt'),
                             'PS_ADM_APPL_DATA',
                             ldata,
                             ['ACADEMIC_LEVEL'],
@@ -867,17 +696,17 @@ FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.admit_term != orb.admit_term
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'TERM_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'TERM_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 4],
                                  os.path.join(cwd, '.archive', 'TERM_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_term_prog.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_term_prog.txt'),
                             'PS_ADM_APPL_PROG',
                             ldata,
                             ['ADMIT_TERM', 'REQ_TERM'],
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_term_prog_{}.txt'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_term_plan.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_term_plan.txt'),
                             'PS_ADM_APPL_PLAN',
                             ldata,
                             ['REQ_TERM'],
@@ -888,11 +717,11 @@ FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.acad_prog != orb.acad_prog
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'PROG_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PROG_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 5],
                                  os.path.join(cwd, '.archive', 'PROG_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_prog.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_prog.txt'),
                             'PS_ADM_APPL_PROG',
                             ldata,
                             ['ACAD_PROG'],
@@ -903,11 +732,11 @@ FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.acad_plan != orb.acad_plan
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'PLAN_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PLAN_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 6],
                                  os.path.join(cwd, '.archive', 'PLAN_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_plan.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_plan.txt'),
                             'PS_ADM_APPL_PLAN',
                             ldata,
                             ['ACAD_PLAN'],
@@ -918,11 +747,11 @@ FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.appl_fee_status != orb.appl_fee_status
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'FEE_STATUS_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'FEE_STATUS_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 9],
                                  os.path.join(cwd, '.archive', 'FEE_STATUS_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_fee_status.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_fee_status.txt'),
                             'PS_ADM_APPL_DATA',
                             ldata,
                             ['APPL_FEE_STATUS'],
@@ -968,11 +797,11 @@ INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = or
 WHERE msb.adm_appl_nbr NOT IN (""" + ui + """) AND msb.prog_action = orb.prog_action
 AND msb.prog_reason != orb.prog_reason
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 8, 26, 27],
                                  os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
+            func.query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
                             'PS_ADM_APPL_PROG',
                             ldata,
                             ['PROG_REASON'],
@@ -1032,18 +861,18 @@ AND msb.admit_term is not null
 AND msb.acad_prog is not null
 AND msb.acad_plan is not null
 ORDER BY 1, 2""")
-            ldata = query_to_csv(os.path.join(cwd, 'update', 'ACTION_CHANGE.csv'),
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'ACTION_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 7, *range(21, 60)],
                                  os.path.join(cwd, '.archive', 'ACTION_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            sdata = filter_rows_by_val(ldata, 2, 'ADMT')
-            query_to_update(os.path.join(cwd, 'update', 'update_dep_calc_needed.txt'),
+            sdata = func.filter_rows_by_val(ldata, 2, 'ADMT')
+            func.query_to_update(os.path.join(cwd, 'update', 'update_dep_calc_needed.txt'),
                             'PS_ADM_APP_CAR_SEQ',
                             sdata,
                             archivename=os.path.join(cwd, '.archive', 'update_dep_calc_needed_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('DEP_CALC_NEEDED', '\'Y\'')])
-            sdata = filter_rows_by_val(ldata, 2, 'MATR')
-            query_to_update(os.path.join(cwd, 'update', 'update_create_prog_status.txt'),
+            sdata = func.filter_rows_by_val(ldata, 2, 'MATR')
+            func.query_to_update(os.path.join(cwd, 'update', 'update_create_prog_status.txt'),
                             'PS_ADM_APP_CAR_SEQ',
                             sdata,
                             archivename=os.path.join(cwd, '.archive', 'update_create_prog_status_{}.txt'.format(today.strftime('%Y%m%d'))),
@@ -1058,19 +887,19 @@ ORDER BY 1, 2""")
                         excerpt = ''
                     effseq = (str(row[9] + 1) if dt.datetime.strptime(row[8], '%Y-%m-%d').date() == today.date() else '1')
                     excerpt += '  INTO PS_ADM_APPL_PROG VALUES ({})\n'.format(
-                            ', '.join(prep_sql_vals(*row[3:8]))
+                            ', '.join(func.prep_sql_vals(*row[3:8]))
                             + ', TRUNC(SYSDATE), {}, '.format(effseq)
-                            + ', '.join(prep_sql_vals(*row[10:14]))
+                            + ', '.join(func.prep_sql_vals(*row[10:14]))
                             + ', TRUNC(SYSDATE), '
-                            + ', '.join(prep_sql_vals(*row[15:28]))
+                            + ', '.join(func.prep_sql_vals(*row[15:28]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
                     excerpt += '  INTO PS_ADM_APPL_PLAN VALUES ({})\n'.format(
-                            ', '.join(prep_sql_vals(*row[29:34]))
+                            ', '.join(func.prep_sql_vals(*row[29:34]))
                             + ', TRUNC(SYSDATE), {}, '.format(effseq)
-                            + ', '.join(prep_sql_vals(row[36]))
-                            + ', TO_DATE({}, \'YYYY-MM-DD\'), '.format(*prep_sql_vals(row[34]))
-                            + ', '.join(prep_sql_vals(*row[38:]))
+                            + ', '.join(func.prep_sql_vals(row[36]))
+                            + ', TO_DATE({}, \'YYYY-MM-DD\'), '.format(*func.prep_sql_vals(row[34]))
+                            + ', '.join(func.prep_sql_vals(*row[38:]))
                             + ', '
                             + ', '.join([*row_metadata, *row_metadata]))
                     ids.add(row[0])
@@ -1080,7 +909,7 @@ ORDER BY 1, 2""")
                     if (i % 500) == 0 and i > 0:
                         stmt_groups.append(excerpt)
                         excerpt = ''
-                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*prep_sql_vals(member))
+                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*func.prep_sql_vals(member))
                 stmt_groups.append(excerpt)
                 while True:
                     try:
@@ -1170,11 +999,11 @@ INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.preferred != orx2.preferred_name
 OR (msx1.preferred is not null and orx2.preferred_name is null)
 ORDER BY 1""")
-            # ldata = query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
+            # ldata = func.query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
             #                      lcur,
             #                      [0, 1, 8, 26, 27],
             #                      os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            # query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
+            # func.query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
             #                 'PS_ADM_APPL_PROG',
             #                 ldata,
             #                 ['PROG_REASON'],

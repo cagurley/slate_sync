@@ -429,6 +429,7 @@ AND (
 )
 ORDER BY 1, 2"""
 
+# Referenced only as part of other queries in this module
 q0005 = """
   SELECT umsb.adm_appl_nbr
   FROM mssbase as umsb
@@ -475,3 +476,146 @@ q0005 = """
     OR uorb.appl_fee_status != umsb.appl_fee_status
   )
 """
+
+q0006 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.admit_type != orb.admit_type
+AND orb.admit_type != 'XRE'
+ORDER BY 1, 2"""
+
+q0007 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.academic_level != orb.academic_level
+ORDER BY 1, 2"""
+
+q0008 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.admit_term != orb.admit_term
+ORDER BY 1, 2"""
+
+q0009 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.acad_prog != orb.acad_prog
+ORDER BY 1, 2"""
+
+q0010 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.acad_plan != orb.acad_plan
+ORDER BY 1, 2"""
+
+q0011 = """SELECT *
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.appl_fee_status != orb.appl_fee_status
+ORDER BY 1, 2"""
+
+q0012 = """SELECT
+  msb.*,
+  orb.*,
+  '' as [BREAK],
+  orx1.emplid,
+  orx1.acad_career,
+  orx1.stdnt_car_nbr,
+  orx1.adm_appl_nbr,
+  orx1.appl_prog_nbr,
+  orx1.effdt,
+  orx1.effseq,
+  orx1.institution,
+  orx1.acad_prog,
+  orx1.prog_status,
+  orx1.prog_action,
+  orx1.action_dt,
+  orx1.prog_reason,
+  orx1.admit_term,
+  orx1.exp_grad_term,
+  orx1.req_term,
+  orx1.acad_load_appr,
+  orx1.campus,
+  orx1.acad_prog_dual,
+  orx1.joint_prog_appr,
+  orx1.ssr_rs_candit_nbr,
+  orx1.ssr_apt_instance,
+  orx1.ssr_yr_of_prog,
+  orx1.ssr_shift,
+  orx1.ssr_cohort_id,
+  orx1.scc_row_add_oprid,
+  orx1.scc_row_add_dttm,
+  orx1.scc_row_upd_oprid,
+  orx1.scc_row_upd_dttm
+FROM mssbase as msb
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.prog_action = orb.prog_action
+AND msb.prog_reason != orb.prog_reason
+ORDER BY 1, 2"""
+
+q0013 = """SELECT
+  msb.*,
+  orb.*,
+  '' as [BREAK],
+  orx1.emplid,
+  orx1.acad_career,
+  orx1.stdnt_car_nbr,
+  orx1.adm_appl_nbr,
+  orx1.appl_prog_nbr,
+  orx1.effdt,
+  orx1.effseq,
+  orx1.institution,
+  msb.acad_prog,
+  orr3.prog_status,
+  msb.prog_action,
+  '',
+  msb.prog_reason,
+  msb.admit_term,
+  orx1.exp_grad_term,
+  msb.admit_term,
+  orx1.acad_load_appr,
+  orx1.campus,
+  orx1.acad_prog_dual,
+  orx1.joint_prog_appr,
+  orx1.ssr_rs_candit_nbr,
+  orx1.ssr_apt_instance,
+  orx1.ssr_yr_of_prog,
+  orx1.ssr_shift,
+  orx1.ssr_cohort_id,
+  '' as [BREAK],
+  orx1.Xemplid,
+  orx1.Xacad_career,
+  orx1.Xstdnt_car_nbr,
+  orx1.Xadm_appl_nbr,
+  orx1.Xappl_prog_nbr,
+  orx1.Xeffdt,
+  orx1.Xeffseq,
+  msb.acad_plan,
+  orx1.Xdeclare_dt,
+  orx1.Xplan_sequence,
+  msb.admit_term,
+  orx1.Xssr_apt_instance,
+  orx1.Xssr_yr_of_prog
+FROM mssbase as msb
+INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
+INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
+INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
+WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.prog_action != orb.prog_action
+AND msb.admit_term is not null
+AND msb.acad_prog is not null
+AND msb.acad_plan is not null
+ORDER BY 1, 2"""
+
+q0014 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.preferred is not null
+ORDER BY 1"""
+
+q0015 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.preferred != orx2.preferred_name
+OR (msx1.preferred is not null and orx2.preferred_name is null)
+ORDER BY 1"""

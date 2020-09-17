@@ -218,12 +218,7 @@ def main():
             lcur.execute(stmt.q0004)
             func.query_to_csv(os.path.join(cwd, 'audit', 'CHANGES_TO_LOCKED_APPLICATIONS.csv'), lcur)
 
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.admit_type != orb.admit_type
-AND orb.admit_type != 'XRE'
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0006)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'TYPE_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 2],
@@ -235,11 +230,7 @@ ORDER BY 1, 2""")
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_type_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.academic_level != orb.academic_level
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0007)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'LEVEL_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 3],
@@ -251,11 +242,7 @@ ORDER BY 1, 2""")
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_level_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.admit_term != orb.admit_term
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0008)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'TERM_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 4],
@@ -272,11 +259,7 @@ ORDER BY 1, 2""")
                             ['REQ_TERM'],
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_term_plan_{}.txt'.format(today.strftime('%Y%m%d'))))
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.acad_prog != orb.acad_prog
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0009)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PROG_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 5],
@@ -287,11 +270,7 @@ ORDER BY 1, 2""")
                             ['ACAD_PROG'],
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_prog_{}.txt'.format(today.strftime('%Y%m%d'))))
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.acad_plan != orb.acad_plan
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0010)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PLAN_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 6],
@@ -302,11 +281,7 @@ ORDER BY 1, 2""")
                             ['ACAD_PLAN'],
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_plan_{}.txt'.format(today.strftime('%Y%m%d'))))
-            lcur.execute("""SELECT *
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.appl_fee_status != orb.appl_fee_status
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0011)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'FEE_STATUS_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 9],
@@ -318,45 +293,7 @@ ORDER BY 1, 2""")
                             row_metadata,
                             archivename=os.path.join(cwd, '.archive', 'update_fee_status_{}.txt'.format(today.strftime('%Y%m%d'))),
                             static_targets=[('APPL_FEE_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_DT', 'TRUNC(SYSDATE)'), ('ADM_UPDATED_BY', row_metauser)])
-            lcur.execute("""SELECT
-  msb.*,
-  orb.*,
-  '' as [BREAK],
-  orx1.emplid,
-  orx1.acad_career,
-  orx1.stdnt_car_nbr,
-  orx1.adm_appl_nbr,
-  orx1.appl_prog_nbr,
-  orx1.effdt,
-  orx1.effseq,
-  orx1.institution,
-  orx1.acad_prog,
-  orx1.prog_status,
-  orx1.prog_action,
-  orx1.action_dt,
-  orx1.prog_reason,
-  orx1.admit_term,
-  orx1.exp_grad_term,
-  orx1.req_term,
-  orx1.acad_load_appr,
-  orx1.campus,
-  orx1.acad_prog_dual,
-  orx1.joint_prog_appr,
-  orx1.ssr_rs_candit_nbr,
-  orx1.ssr_apt_instance,
-  orx1.ssr_yr_of_prog,
-  orx1.ssr_shift,
-  orx1.ssr_cohort_id,
-  orx1.scc_row_add_oprid,
-  orx1.scc_row_add_dttm,
-  orx1.scc_row_upd_oprid,
-  orx1.scc_row_upd_dttm
-FROM mssbase as msb
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.prog_action = orb.prog_action
-AND msb.prog_reason != orb.prog_reason
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0012)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 8, 26, 27],
@@ -369,58 +306,7 @@ ORDER BY 1, 2""")
                             ['EFFDT', 'EFFSEQ'],
                             [('TO_DATE(', ', \'YYYY-MM-DD\')'), ('', '')],
                             os.path.join(cwd, '.archive', 'update_reason_{}.txt'.format(today.strftime('%Y%m%d'))))
-            lcur.execute("""SELECT
-  msb.*,
-  orb.*,
-  '' as [BREAK],
-  orx1.emplid,
-  orx1.acad_career,
-  orx1.stdnt_car_nbr,
-  orx1.adm_appl_nbr,
-  orx1.appl_prog_nbr,
-  orx1.effdt,
-  orx1.effseq,
-  orx1.institution,
-  msb.acad_prog,
-  orr3.prog_status,
-  msb.prog_action,
-  '',
-  msb.prog_reason,
-  msb.admit_term,
-  orx1.exp_grad_term,
-  msb.admit_term,
-  orx1.acad_load_appr,
-  orx1.campus,
-  orx1.acad_prog_dual,
-  orx1.joint_prog_appr,
-  orx1.ssr_rs_candit_nbr,
-  orx1.ssr_apt_instance,
-  orx1.ssr_yr_of_prog,
-  orx1.ssr_shift,
-  orx1.ssr_cohort_id,
-  '' as [BREAK],
-  orx1.Xemplid,
-  orx1.Xacad_career,
-  orx1.Xstdnt_car_nbr,
-  orx1.Xadm_appl_nbr,
-  orx1.Xappl_prog_nbr,
-  orx1.Xeffdt,
-  orx1.Xeffseq,
-  msb.acad_plan,
-  orx1.Xdeclare_dt,
-  orx1.Xplan_sequence,
-  msb.admit_term,
-  orx1.Xssr_apt_instance,
-  orx1.Xssr_yr_of_prog
-FROM mssbase as msb
-INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-INNER JOIN oraaux1 as orx1 on orb.emplid = orx1.emplid and orb.adm_appl_nbr = orx1.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.prog_action != orb.prog_action
-AND msb.admit_term is not null
-AND msb.acad_prog is not null
-AND msb.acad_plan is not null
-ORDER BY 1, 2""")
+            lcur.execute(stmt.q0013)
             ldata = func.query_to_csv(os.path.join(cwd, 'update', 'ACTION_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 7, *range(21, 60)],
@@ -508,11 +394,7 @@ AND msb.prog_action = 'MATR'
 ORDER BY 1, 2""")
 
             # Auxiliary queries
-            lcur.execute("""SELECT *
-FROM mssaux1 as msx1
-INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
-WHERE msx1.preferred is not null
-ORDER BY 1""")
+            lcur.execute(stmt.q0014)
             with TemporaryFile('r+', newline='') as tfile:
                 twriter = csv.writer(tfile)
                 header = []
@@ -553,12 +435,7 @@ ORDER BY 1""")
                         except OSError as e:
                             print(str(e))
                             input('Ensure that the file or directory is not open or locked, then press enter to try again.')
-            lcur.execute("""SELECT *
-FROM mssaux1 as msx1
-INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
-WHERE msx1.preferred != orx2.preferred_name
-OR (msx1.preferred is not null and orx2.preferred_name is null)
-ORDER BY 1""")
+            lcur.execute(stmt.q0015)
             # ldata = func.query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
             #                      lcur,
             #                      [0, 1, 8, 26, 27],

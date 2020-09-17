@@ -17,9 +17,6 @@ import statement as stmt
 
 def main():
     try:
-        connop = None
-        qvars = None
-        root = ''
         cwd = os.getcwd()
         today = dt.datetime.today()
         if 'HOME' in os.environ:
@@ -368,30 +365,6 @@ def main():
                     except OSError as e:
                         print(str(e))
                         input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
-            lcur.execute("""SELECT
-  msb.*,
-  orb.*
-FROM mssbase as msb
-INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.prog_action != orb.prog_action
-AND msb.admit_term is not null
-AND msb.acad_prog is not null
-AND msb.acad_plan is not null
-AND msb.prog_action = 'ADMT'
-ORDER BY 1, 2""")
-            lcur.execute("""SELECT
-  msb.*,
-  orb.*
-FROM mssbase as msb
-INNER JOIN oraref3 as orr3 on msb.prog_action = orr3.prog_action
-INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
-WHERE msb.adm_appl_nbr NOT IN (""" + stmt.q0005 + """) AND msb.prog_action != orb.prog_action
-AND msb.admit_term is not null
-AND msb.acad_prog is not null
-AND msb.acad_plan is not null
-AND msb.prog_action = 'MATR'
-ORDER BY 1, 2""")
 
             # Auxiliary queries
             lcur.execute(stmt.q0014)

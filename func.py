@@ -128,7 +128,7 @@ def prep_sql_vals(*args):
     prepped = []
     for value in args:
         if isinstance(value, str):
-            prepped.append('\'' + value + '\'')
+            prepped.append('\'' + value.replace('\'', '\'\'') + '\'')
         else:
             prepped.append(str(value))
     return prepped

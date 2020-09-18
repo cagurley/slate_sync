@@ -9,6 +9,7 @@ import datetime as dt
 import json
 import os
 import pyodbc
+import re
 import shutil
 import sqlite3
 import func
@@ -409,10 +410,75 @@ def main():
                             print(str(e))
                             input('Ensure that the file or directory is not open or locked, then press enter to try again.')
             lcur.execute(stmt.q0015)
-            # ldata = func.query_to_csv(os.path.join(cwd, 'update', 'REASON_CHANGE.csv'),
-            #                      lcur,
-            #                      [0, 1, 8, 26, 27],
-            #                      os.path.join(cwd, '.archive', 'REASON_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PREFERRED_NAME_CHANGE.csv'),
+                                 lcur,
+                                 [0, 1, 19, 20, 21, 22],
+                                 os.path.join(cwd, '.archive', 'PREFERRED_NAME_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+            if ldata:
+                lids = set()
+                for row in ldata:
+                    lids.add('  ' + func.prep_sql_vals(row[0])[0])
+                del_stmt = 'DELETE FROM PS_NAMES\nWHERE EFFDT = TRUNC(SYSDATE)\nAND EMPLID IN (\n'
+                del_stmt += ',\n'.join(lids)
+                del_stmt += '\n);\n'
+                ids = set()
+                stmt_groups = []
+                excerpt = ''
+                for i, row in enumerate(ldata):
+                    if (i % 500) == 0 and i > 0:
+                        stmt_groups.append(excerpt)
+                        excerpt = ''
+                    tapref = func.translate_ascii(row[1]).strip()
+                    tapref_srch = re.sub(r'\W', '', tapref.upper())
+                    last_srch = re.sub(r'\W', '', row[4].upper())
+                    excerpt += '  INTO PS_NAMES VALUES ({})\n'.format(
+                            ', '.join([
+                                *func.prep_sql_vals(row[0], 'PRF'),
+                                'TRUNC(SYSDATE)',
+                                *func.prep_sql_vals(
+                                    'A',
+                                    '001',
+                                    ','.join([row[4], ' '.join([tapref, row[3]])]).rstrip(),
+                                    ' ',
+                                    row[2],
+                                    row[5],
+                                    *(' ' * 3),
+                                    last_srch,
+                                    tapref_srch,
+                                    row[4],
+                                    tapref,
+                                    row[3],
+                                    *(' ' * 6),
+                                    '1',
+                                    ' '.join([tapref, row[4]]),
+                                    ' '.join([tapref, row[4]]),
+                                    (tapref_srch + last_srch)
+                                ),
+                                row_metadttm,
+                                row_metauser
+                            ])
+                    )
+                    ids.add(row[0])
+                stmt_groups.append(excerpt)
+                excerpt = ''
+                for i, member in enumerate(ids):
+                    if (i % 500) == 0 and i > 0:
+                        stmt_groups.append(excerpt)
+                        excerpt = ''
+                    excerpt += '  INTO PS_L_DIRXML VALUES ({})\n'.format(*func.prep_sql_vals(member))
+                stmt_groups.append(excerpt)
+                while True:
+                    try:
+                        with open(os.path.join(cwd, 'update', 'insert_preferred_name.txt'), 'w') as file:
+                            file.write(del_stmt)
+                            for row in stmt_groups:
+                                file.write('INSERT ALL\n{}SELECT * FROM dual;\n'.format(row))
+                        shutil.copyfile(os.path.join(cwd, 'update', 'insert_preferred_name.txt'),
+                                        os.path.join(cwd, '.archive', 'insert_preferred_name_{}.txt'.format(today.strftime('%Y%m%d'))))
+                        break
+                    except OSError as e:
+                        print(str(e))
+                        input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
             # func.query_to_update(os.path.join(cwd, 'update', 'update_reason.txt'),
             #                 'PS_ADM_APPL_PROG',
             #                 ldata,

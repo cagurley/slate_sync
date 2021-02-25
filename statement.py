@@ -68,6 +68,7 @@ ct_orx2 = """CREATE TABLE oraaux2 (
   emplid text,
   preferred_name text,
   name_prefix text,
+  first_name text,
   middle_name text,
   last_name int,
   name_suffix text,
@@ -103,7 +104,7 @@ ct_msb = """CREATE TABLE mssbase (
   appl_fee_status text
 )"""
 
-ct_msx = """CREATE TABLE mssaux1 (
+ct_msx1 = """CREATE TABLE mssaux1 (
   emplid text,
   preferred text,
   primary_phone text,
@@ -265,6 +266,7 @@ qi_orx2 = """SELECT DISTINCT
   A.EMPLID,
   B.FIRST_NAME AS "PREFERRED_NAME",
   BB.NAME_PREFIX,
+  BB.FIRST_NAME,
   BB.MIDDLE_NAME,
   BB.LAST_NAME,
   BB.NAME_SUFFIX,
@@ -328,6 +330,12 @@ WHERE NOT EXISTS (
   AND XA.ADVISOR_CUR <> 'Y'
   AND XA.INSTRCTOR_CUR <> 'Y'
   AND XA.FRIEND_CUR <> 'Y'
+)
+AND NOT EXISTS (
+  SELECT *
+  FROM PS_PERSON XA
+  WHERE A.EMPLID = XA.EMPLID
+  AND XA.DT_OF_DEATH IS NOT NULL
 )
 AND A.ADMIT_TERM BETWEEN :termlb AND :termub
 AND A.ACAD_CAREER = 'UGRD'
@@ -624,6 +632,11 @@ ORDER BY 1"""
 q0015 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
-WHERE msx1.preferred != orx2.preferred_name
-OR (msx1.preferred is not null and orx2.preferred_name is null)
+WHERE msx1.preferred is not null
+AND (msx1.preferred != orx2.preferred_name or orx2.preferred_name is null)
+AND NOT EXISTS (
+  SELECT *
+  FROM mssaux2 as msx2
+  WHERE msx1.emplid = msx2.emplid
+)
 ORDER BY 1"""

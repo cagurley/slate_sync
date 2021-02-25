@@ -68,6 +68,7 @@ def main():
             lcur.execute('DROP TABLE IF EXISTS oraaux2')
             lcur.execute('DROP TABLE IF EXISTS mssbase')
             lcur.execute('DROP TABLE IF EXISTS mssaux1')
+            lcur.execute('DROP TABLE IF EXISTS mssaux2')
             lcur.execute('DROP TABLE IF EXISTS oraref1')
             lcur.execute('DROP TABLE IF EXISTS oraref2')
             lcur.execute('DROP TABLE IF EXISTS oraref3')
@@ -76,7 +77,8 @@ def main():
             lcur.execute(stmt.ct_orx1)
             lcur.execute(stmt.ct_orx2)
             lcur.execute(stmt.ct_msb)
-            lcur.execute(stmt.ct_msx)
+            lcur.execute(stmt.ct_msx1)
+            lcur.execute('CREATE TABLE mssaux2 (emplid text)')
             lcur.execute('CREATE TABLE oraref1 (acad_prog text, acad_plan text)')
             lcur.execute('CREATE TABLE oraref2 (prog_action text, prog_reason text)')
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
@@ -86,6 +88,7 @@ def main():
             lcur.execute('CREATE INDEX orax2 ON oraaux2 (emplid)')
             lcur.execute('CREATE INDEX mssb ON mssbase (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX mssx1 ON mssaux1 (emplid)')
+            lcur.execute('CREATE INDEX mssx2 ON mssaux2 (emplid)')
             lcur.execute('CREATE INDEX orar1 ON oraref1 (acad_prog, acad_plan)')
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
             lcur.execute('CREATE INDEX orar3 ON oraref3 (prog_status, prog_action)')
@@ -175,7 +178,7 @@ def main():
                         if not rows:
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
-                        lcur.executemany('INSERT INTO oraaux2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lcur.executemany('INSERT INTO oraaux2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -379,12 +382,17 @@ def main():
                     counter += 1
                     # Filter for non-ASCII characters
                     ffrows = []
+                    ffids = []
                     for row in frows:
                         for letter in row[1]:
                             if ord(letter) > 127:
                                 ffrows.append(row)
+                                ffids.append((row[0],))
                                 break
                     twriter.writerows(ffrows)
+                    if ffids:
+                        lcur.executemany('INSERT INTO mssaux2 VALUES (?)', ffids)
+                        lconn.commit()
                 write_perm = False
                 tfile.seek(0)
                 treader = csv.reader(tfile)
@@ -403,68 +411,10 @@ def main():
                             print(str(e))
                             input('Ensure that the file or directory is not open or locked, then press enter to try again.')
             lcur.execute(stmt.q0015)
-            ldata = func.query_to_csv(os.path.join(cwd, 'update', 'PREFERRED_NAME_CHANGE.csv'),
+            func.query_to_csv(os.path.join(cwd, 'update', 'PREFERRED_NAME_CHANGE.csv'),
                                  lcur,
                                  [0, 1, 19, 20, 21, 22],
                                  os.path.join(cwd, '.archive', 'PREFERRED_NAME_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
-            if ldata:
-                lids = []
-                del_stmts = []
-                stmt_groups = []
-                excerpt = ''
-                for i, row in enumerate(ldata):
-                    if (i % 500) == 0 and i > 0:
-                        del_stmts.append('DELETE FROM PS_NAMES\nWHERE EFFDT = TRUNC(SYSDATE)\nAND EMPLID IN (\n{}\n);\n'.format(',\n'.join(lids)))
-                        lids = []
-                        stmt_groups.append(excerpt)
-                        excerpt = ''
-                    lids.append('  ' + func.prep_sql_vals(row[0])[0])
-                    tapref = func.translate_ascii(row[1]).strip()
-                    tapref_srch = re.sub(r'\W', '', tapref.upper())
-                    last_srch = re.sub(r'\W', '', row[4].upper())
-                    excerpt += '  INTO PS_NAMES VALUES ({})\n'.format(
-                            ', '.join([
-                                *func.prep_sql_vals(row[0], 'PRF'),
-                                'TRUNC(SYSDATE)',
-                                *func.prep_sql_vals(
-                                    'A',
-                                    '001',
-                                    ','.join([row[4], ' '.join([tapref, row[3]])]).rstrip(),
-                                    ' ',
-                                    row[2],
-                                    row[5],
-                                    *(' ' * 3),
-                                    last_srch,
-                                    tapref_srch,
-                                    row[4],
-                                    tapref,
-                                    row[3],
-                                    *(' ' * 6),
-                                    '1',
-                                    ' '.join([tapref, row[4]]),
-                                    ' '.join([tapref, row[4]]),
-                                    (tapref_srch + last_srch)
-                                ),
-                                row_metadttm,
-                                row_metauser
-                            ])
-                    )
-                    ids.add(row[0])
-                del_stmts.append('DELETE FROM PS_NAMES\nWHERE EFFDT = TRUNC(SYSDATE)\nAND EMPLID IN (\n{}\n);\n'.format(',\n'.join(lids)))
-                stmt_groups.append(excerpt)
-                while True:
-                    try:
-                        with open(os.path.join(cwd, 'update', 'insert_preferred_name.txt'), 'w') as file:
-                            for row in del_stmts:
-                                file.write(row)
-                            for row in stmt_groups:
-                                file.write('INSERT ALL\n{}SELECT * FROM dual;\n'.format(row))
-                        shutil.copyfile(os.path.join(cwd, 'update', 'insert_preferred_name.txt'),
-                                        os.path.join(cwd, '.archive', 'insert_preferred_name_{}.txt'.format(today.strftime('%Y%m%d'))))
-                        break
-                    except OSError as e:
-                        print(str(e))
-                        input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
             if ids:
                 stmt_groups = []
                 excerpt = ''

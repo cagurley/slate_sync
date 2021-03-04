@@ -151,13 +151,13 @@ qi_msx1 = """select distinct
   p.[phone] as [PRIMARY_PHONE],
   p.[mobile] as [MOBILE_PHONE],
   p.[email] as [EMAIL],
-  pad.[country] as [PERMANENT_COUNTRY],
+  padw.[alpha3] as [PERMANENT_COUNTRY],
   pad.[street] as [PERMANENT_STREET],
   pad.[city] as [PERMANENT_CITY],
   pad.[county] as [PERMANENT_COUNTY],
   pad.[region] as [PERMANENT_REGION],
   pad.[postal] as [PERMANENT_POSTAL],
-  mad.[country] as [MAILING_COUNTRY],
+  madw.[alpha3] as [MAILING_COUNTRY],
   mad.[street] as [MAILING_STREET],
   mad.[city] as [MAILING_CITY],
   mad.[county] as [MAILING_COUNTY],
@@ -168,7 +168,9 @@ inner join [person] as p on a.[person] = p.[id]
 inner join [lookup.round] as lr on a.[round] = lr.[id]
 inner join [lookup.period] as lp on lr.[period] = lp.[id]
 left outer join [address] as pad on a.[person] = pad.[record] and pad.[type] = 'permanent' and pad.[rank] = 1
+left outer join world.dbo.[country] as padw on pad.[country] = padw.[id]
 left outer join [address] as mad on a.[person] = mad.[record] and mad.[type] is null and mad.[rank] = 1
+left outer join world.dbo.[country] as madw on mad.[country] = madw.[id]
 where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
 and lr.[key] != 'GR'
 and a.[submitted] is not null
@@ -632,8 +634,40 @@ ORDER BY 1"""
 q0015 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
-WHERE msx1.preferred is not null
-AND (msx1.preferred != orx2.preferred_name or orx2.preferred_name is null)
+WHERE msx1.mailing_street is not null
+ORDER BY 1"""
+
+q0049 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+INNER JOIN (
+  SELECT
+    emplid,
+	group_concat(column) as nonascii_columns
+  FROM mssaux2
+  GROUP BY emplid
+) as msx2 on msx1.emplid = msx2.emplid
+ORDER BY 1"""
+
+q0050 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE (
+  (
+    msx1.preferred is not null
+    AND msx1.preferred != coalesce(orx2.preferred_name, '')
+  ) OR (
+    msx1.mailing_street is not null
+    AND (
+      msx1.mailing_country != coalesce(orx2.mail_country, '')
+      OR msx1.mailing_street != coalesce(orx2.mail_street, '')
+      OR msx1.mailing_city != coalesce(orx2.mail_city, '')
+      OR msx1.mailing_county != coalesce(orx2.mail_county, '')
+      OR msx1.mailing_region != coalesce(orx2.mail_state, '')
+      OR msx1.mailing_postal != coalesce(orx2.mail_postal, '')
+    )
+  )
+)
 AND NOT EXISTS (
   SELECT *
   FROM mssaux2 as msx2

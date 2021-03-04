@@ -78,7 +78,7 @@ def main():
             lcur.execute(stmt.ct_orx2)
             lcur.execute(stmt.ct_msb)
             lcur.execute(stmt.ct_msx1)
-            lcur.execute('CREATE TABLE mssaux2 (emplid text)')
+            lcur.execute('CREATE TABLE mssaux2 (emplid text, column integer)')
             lcur.execute('CREATE TABLE oraref1 (acad_prog text, acad_plan text)')
             lcur.execute('CREATE TABLE oraref2 (prog_action text, prog_reason text)')
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
@@ -365,56 +365,51 @@ def main():
 
             # Auxiliary queries
             lcur.execute(stmt.q0014)
-            with TemporaryFile('r+', newline='') as tfile:
-                twriter = csv.writer(tfile)
-                header = []
-                for row in lcur.description:
-                    if len(row) > 0:
-                        header.append(row[0])
-                twriter.writerow(header)
-                counter = 0
-                while True:
-                    frows = lcur.fetchmany(500)
-                    if not frows:
-                        print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
-                        break
-                    print(f'Fetched and wrote from row {counter*500 + 1}...')
-                    counter += 1
-                    # Filter for non-ASCII characters
-                    ffrows = []
-                    ffids = []
-                    for row in frows:
-                        for letter in row[1]:
-                            if ord(letter) > 127:
-                                ffrows.append(row)
-                                ffids.append((row[0],))
-                                break
-                    twriter.writerows(ffrows)
-                    if ffids:
-                        lcur.executemany('INSERT INTO mssaux2 VALUES (?)', ffids)
-                        lconn.commit()
-                write_perm = False
-                tfile.seek(0)
-                treader = csv.reader(tfile)
-                for i, row in enumerate(treader):
-                    if i == 1:
-                        write_perm = True
-                        break
-                if write_perm:
-                    tfile.seek(0)
-                    while True:
-                        try:
-                            with open(os.path.join(cwd, 'audit', 'NONASCII_PREFERRED.csv'), 'w', newline='') as file:
-                                file.write(tfile.read())
+            counter = 0
+            while True:
+                frows = lcur.fetchmany(500)
+                if not frows:
+                    print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
+                    break
+                print(f'Fetched and wrote from row {counter * 500 + 1}...')
+                counter += 1
+                # Filter for non-ASCII characters
+                ffids = []
+                for row in frows:
+                    for letter in row[1]:
+                        if ord(letter) > 127:
+                            ffids.append((row[0], 1))
                             break
-                        except OSError as e:
-                            print(str(e))
-                            input('Ensure that the file or directory is not open or locked, then press enter to try again.')
+                if ffids:
+                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
+                    lconn.commit()
             lcur.execute(stmt.q0015)
-            func.query_to_csv(os.path.join(cwd, 'update', 'PREFERRED_NAME_CHANGE.csv'),
+            counter = 0
+            while True:
+                frows = lcur.fetchmany(500)
+                if not frows:
+                    print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
+                    break
+                print(f'Fetched and wrote from row {counter * 500 + 1}...')
+                counter += 1
+                # Filter for non-ASCII characters
+                ffids = []
+                for row in frows:
+                    for num in range(11, 17):
+                        if row[num] is not None:
+                            for letter in row[num]:
+                                if ord(letter) > 127:
+                                    ffids.append((row[0], num))
+                                    break
+                if ffids:
+                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
+                    lconn.commit()
+            lcur.execute(stmt.q0049)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'NONASCII_DATA.csv'), lcur)
+            lcur.execute(stmt.q0050)
+            func.query_to_csv(os.path.join(cwd, 'update', 'BIO_DEMO_CHANGE.csv'),
                                  lcur,
-                                 [0, 1, 19, 20, 21, 22],
-                                 os.path.join(cwd, '.archive', 'PREFERRED_NAME_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+                                 archivename=os.path.join(cwd, '.archive', 'BIO_DEMO_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
             if ids:
                 stmt_groups = []
                 excerpt = ''

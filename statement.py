@@ -682,6 +682,12 @@ INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.mobile_phone is not null
 ORDER BY 1"""
 
+q0019 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.email is not null
+ORDER BY 1"""
+
 q0049 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
@@ -738,6 +744,9 @@ WHERE (
   ) OR (
     msx1.mobile_phone is not null
     AND msx1.mobile_phone != coalesce(orx2.cell_phone, '')
+  ) OR (
+    msx1.email is not null
+    AND msx1.email != coalesce(orx2.other_email, '')
   )
 )
 AND NOT EXISTS (

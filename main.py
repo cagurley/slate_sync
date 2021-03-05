@@ -476,6 +476,25 @@ def main():
                 if ffids:
                     lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
                     lconn.commit()
+            lcur.execute(stmt.q0019)
+            counter = 0
+            while True:
+                frows = lcur.fetchmany(500)
+                if not frows:
+                    print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
+                    break
+                print(f'Fetched and wrote from row {counter * 500 + 1}...')
+                counter += 1
+                # Filter for non-ASCII characters
+                ffids = []
+                for row in frows:
+                    for letter in row[4]:
+                        if ord(letter) > 127:
+                            ffids.append((row[0], 4))
+                            break
+                if ffids:
+                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
+                    lconn.commit()
             lcur.execute(stmt.q0049)
             func.query_to_csv(os.path.join(cwd, 'audit', 'NONASCII_DATA.csv'), lcur)
             lcur.execute(stmt.q0050)

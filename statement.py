@@ -148,8 +148,14 @@ order by 1, 2"""
 qi_msx1 = """select distinct
   (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID],
   p.[preferred] as [PREFERRED],
-  p.[phone] as [PRIMARY_PHONE],
-  p.[mobile] as [MOBILE_PHONE],
+  (case
+  when len(p.[phone]) = 15 and substring(p.[phone], 1, 3) = '+1 ' then convert(varchar(32), replace(right(p.[phone], 12), '-', ''))
+  else p.[phone]
+  end) as [PRIMARY_PHONE],
+  (case
+  when len(p.[mobile]) = 15 and substring(p.[mobile], 1, 3) = '+1 ' then convert(varchar(32), replace(right(p.[mobile], 12), '-', ''))
+  else p.[mobile]
+  end) as [MOBILE_PHONE],
   p.[email] as [EMAIL],
   padw.[alpha3] as [PERMANENT_COUNTRY],
   pad.[street] as [PERMANENT_STREET],
@@ -637,16 +643,35 @@ INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.mailing_street is not null
 ORDER BY 1"""
 
+q0016 = """"""
+
+q0017 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.primary_phone is not null
+ORDER BY 1"""
+
+q0018 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.mobile_phone is not null
+ORDER BY 1"""
+
 q0049 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 INNER JOIN (
   SELECT
-    emplid,
-	group_concat(column) as nonascii_columns
-  FROM mssaux2
+    msx2.emplid,
+    group_concat(msx2.column) as nonascii_columns
+  FROM (
+SELECT *
+FROM mssaux2
+ORDER BY 1, 2
+  ) as msx2
   GROUP BY emplid
-) as msx2 on msx1.emplid = msx2.emplid
+  ORDER BY 1
+) as msx2gc on msx1.emplid = msx2gc.emplid
 ORDER BY 1"""
 
 q0050 = """SELECT *
@@ -666,6 +691,12 @@ WHERE (
       OR msx1.mailing_region != coalesce(orx2.mail_state, '')
       OR msx1.mailing_postal != coalesce(orx2.mail_postal, '')
     )
+  ) OR (
+    msx1.primary_phone is not null
+    AND msx1.primary_phone != coalesce(orx2.home_phone, '')
+  ) OR (
+    msx1.mobile_phone is not null
+    AND msx1.mobile_phone != coalesce(orx2.cell_phone, '')
   )
 )
 AND NOT EXISTS (

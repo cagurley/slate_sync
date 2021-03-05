@@ -183,6 +183,25 @@ and a.[submitted] is not null
 and lp.[active] = 1
 order by 1"""
 
+qi_msx3 = """select distinct
+  (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID]
+from [application] as a
+inner join [person] as p on a.[person] = p.[id]
+inner join [lookup.round] as lr on a.[round] = lr.[id]
+inner join [lookup.period] as lp on lr.[period] = lp.[id]
+where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
+and lr.[key] != 'GR'
+and a.[submitted] is not null
+and lp.[active] = 1
+and exists (
+  select *
+  from [field]
+  where p.[id] = [record]
+  and [field] = 'citizenship_status'
+  and [prompt] = '01116174-db87-4115-8729-2785c7230017'
+)
+order by 1"""
+
 qi_orb = """SELECT
   A.EMPLID,
   A.ADM_APPL_NBR,
@@ -641,9 +660,15 @@ q0015 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.mailing_street is not null
+AND msx1.mailing_city is not null
 ORDER BY 1"""
 
-q0016 = """"""
+q0016 = """SELECT *
+FROM mssaux1 as msx1
+INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
+WHERE msx1.permanent_street is not null
+AND msx1.permanent_city is not null
+ORDER BY 1"""
 
 q0017 = """SELECT *
 FROM mssaux1 as msx1
@@ -683,6 +708,7 @@ WHERE (
     AND msx1.preferred != coalesce(orx2.preferred_name, '')
   ) OR (
     msx1.mailing_street is not null
+    AND msx1.mailing_city is not null
     AND (
       msx1.mailing_country != coalesce(orx2.mail_country, '')
       OR msx1.mailing_street != coalesce(orx2.mail_street, '')
@@ -690,6 +716,21 @@ WHERE (
       OR msx1.mailing_county != coalesce(orx2.mail_county, '')
       OR msx1.mailing_region != coalesce(orx2.mail_state, '')
       OR msx1.mailing_postal != coalesce(orx2.mail_postal, '')
+    )
+  ) OR (
+    NOT EXISTS (
+      SELECT *
+      FROM mssaux3 as msx3
+      WHERE msx1.emplid = msx3.emplid
+    ) AND msx1.permanent_street is not null
+    AND msx1.permanent_city is not null
+    AND (
+      msx1.permanent_country != coalesce(orx2.home_country, '')
+      OR msx1.permanent_street != coalesce(orx2.home_street, '')
+      OR msx1.permanent_city != coalesce(orx2.home_city, '')
+      OR msx1.permanent_county != coalesce(orx2.home_county, '')
+      OR msx1.permanent_region != coalesce(orx2.home_state, '')
+      OR msx1.permanent_postal != coalesce(orx2.home_postal, '')
     )
   ) OR (
     msx1.primary_phone is not null

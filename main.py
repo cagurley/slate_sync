@@ -79,6 +79,7 @@ def main():
             lcur.execute(stmt.ct_msb)
             lcur.execute(stmt.ct_msx1)
             lcur.execute('CREATE TABLE mssaux2 (emplid text, column integer)')
+            lcur.execute('CREATE TABLE mssaux3 (emplid text)')
             lcur.execute('CREATE TABLE oraref1 (acad_prog text, acad_plan text)')
             lcur.execute('CREATE TABLE oraref2 (prog_action text, prog_reason text)')
             lcur.execute('CREATE TABLE oraref3 (prog_status text, prog_action text unique, rank int)')
@@ -89,6 +90,7 @@ def main():
             lcur.execute('CREATE INDEX mssb ON mssbase (emplid, adm_appl_nbr)')
             lcur.execute('CREATE INDEX mssx1 ON mssaux1 (emplid)')
             lcur.execute('CREATE INDEX mssx2 ON mssaux2 (emplid)')
+            lcur.execute('CREATE INDEX mssx3 ON mssaux3 (emplid)')
             lcur.execute('CREATE INDEX orar1 ON oraref1 (acad_prog, acad_plan)')
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
             lcur.execute('CREATE INDEX orar3 ON oraref3 (prog_status, prog_action)')
@@ -136,6 +138,17 @@ def main():
                             print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
                             break
                         lcur.executemany('INSERT INTO mssaux1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+                        lconn.commit()
+                        print(f'Fetched and inserted from row {fc*500 + 1}...')
+                        fc += 1
+                    cur.execute(stmt.qi_msx3)
+                    fc = 0
+                    while True:
+                        rows = cur.fetchmany(500)
+                        if not rows:
+                            print(f'\nFetched and inserted {cur.rowcount} total rows.\n\n')
+                            break
+                        lcur.executemany('INSERT INTO mssaux3 VALUES (?)', rows)
                         lconn.commit()
                         print(f'Fetched and inserted from row {fc*500 + 1}...')
                         fc += 1
@@ -396,6 +409,27 @@ def main():
                 ffids = []
                 for row in frows:
                     for num in range(11, 17):
+                        if row[num] is not None:
+                            for letter in row[num]:
+                                if ord(letter) > 127:
+                                    ffids.append((row[0], num))
+                                    break
+                if ffids:
+                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
+                    lconn.commit()
+            lcur.execute(stmt.q0016)
+            counter = 0
+            while True:
+                frows = lcur.fetchmany(500)
+                if not frows:
+                    print(f'\nFetched and wrote {lcur.rowcount} total rows.\n\n')
+                    break
+                print(f'Fetched and wrote from row {counter * 500 + 1}...')
+                counter += 1
+                # Filter for non-ASCII characters
+                ffids = []
+                for row in frows:
+                    for num in range(5, 11):
                         if row[num] is not None:
                             for letter in row[num]:
                                 if ord(letter) > 127:

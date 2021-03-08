@@ -297,8 +297,8 @@ qi_orx2 = """SELECT DISTINCT
   BB.MIDDLE_NAME,
   BB.LAST_NAME,
   BB.NAME_SUFFIX,
-  (CASE WHEN C.PHONE_TYPE IS NOT NULL THEN ('+' || REGEXP_SUBSTR(C.COUNTRY_CODE, '[1-9]*$') ||  ' ' || REGEXP_REPLACE(C.PHONE, '[\/-]')) END) AS "HOME_PHONE",
-  (CASE WHEN D.PHONE_TYPE IS NOT NULL THEN ('+' || REGEXP_SUBSTR(D.COUNTRY_CODE, '[1-9]*$') ||  ' ' || REGEXP_REPLACE(D.PHONE, '[\/-]')) END) AS "CELL_PHONE",
+  C.PHONE AS "HOME_PHONE",
+  D.PHONE AS "CELL_PHONE",
   E.PHONE_TYPE AS "PHONE_PREF",
   F.EMAIL_ADDR AS "OTHER_EMAIL",
   G.E_ADDR_TYPE AS "EMAIL_PREF",
@@ -705,53 +705,87 @@ ORDER BY 1, 2
 ) as msx2gc on msx1.emplid = msx2gc.emplid
 ORDER BY 1"""
 
-q0050 = """SELECT *
+q0050 = """SELECT DISTINCT
+  msx1.emplid,
+  msxpn.preferred,
+  msxpp.primary_phone,
+  msxmp.mobile_phone,
+  msxe.email,
+  msxpa.permanent_country,
+  msxpa.permanent_street,
+  msxpa.permanent_city,
+  msxpa.permanent_county,
+  msxpa.permanent_region,
+  msxpa.permanent_postal,
+  msxma.mailing_country,
+  msxma.mailing_street,
+  msxma.mailing_city,
+  msxma.mailing_county,
+  msxma.mailing_region,
+  msxma.mailing_postal,
+  orx2.*
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
-WHERE (
-  (
-    msx1.preferred is not null
-    AND msx1.preferred != coalesce(orx2.preferred_name, '')
-  ) OR (
-    msx1.mailing_street is not null
-    AND msx1.mailing_city is not null
-    AND (
-      msx1.mailing_country != coalesce(orx2.mail_country, '')
-      OR msx1.mailing_street != coalesce(orx2.mail_street, '')
-      OR msx1.mailing_city != coalesce(orx2.mail_city, '')
-      OR msx1.mailing_county != coalesce(orx2.mail_county, '')
-      OR msx1.mailing_region != coalesce(orx2.mail_state, '')
-      OR msx1.mailing_postal != coalesce(orx2.mail_postal, '')
-    )
-  ) OR (
-    NOT EXISTS (
-      SELECT *
-      FROM mssaux3 as msx3
-      WHERE msx1.emplid = msx3.emplid
-    ) AND msx1.permanent_street is not null
-    AND msx1.permanent_city is not null
-    AND (
-      msx1.permanent_country != coalesce(orx2.home_country, '')
-      OR msx1.permanent_street != coalesce(orx2.home_street, '')
-      OR msx1.permanent_city != coalesce(orx2.home_city, '')
-      OR msx1.permanent_county != coalesce(orx2.home_county, '')
-      OR msx1.permanent_region != coalesce(orx2.home_state, '')
-      OR msx1.permanent_postal != coalesce(orx2.home_postal, '')
-    )
-  ) OR (
-    msx1.primary_phone is not null
-    AND msx1.primary_phone != coalesce(orx2.home_phone, '')
-  ) OR (
-    msx1.mobile_phone is not null
-    AND msx1.mobile_phone != coalesce(orx2.cell_phone, '')
-  ) OR (
-    msx1.email is not null
-    AND msx1.email != coalesce(orx2.other_email, '')
+LEFT OUTER JOIN mssaux1 as msxpn on (
+  msx1.emplid = msxpn.emplid
+  AND msxpn.preferred is not null
+  AND msxpn.preferred != coalesce(orx2.preferred_name, '')
+)
+LEFT OUTER JOIN mssaux1 as msxpp on (
+  msx1.emplid = msxpp.emplid
+  AND msxpp.primary_phone is not null
+  AND msxpp.primary_phone != coalesce(orx2.home_phone, '')
+)
+LEFT OUTER JOIN mssaux1 as msxmp on (
+  msx1.emplid = msxmp.emplid
+  AND msxmp.mobile_phone is not null
+  AND msxmp.mobile_phone != coalesce(orx2.cell_phone, '')
+)
+LEFT OUTER JOIN mssaux1 as msxe on (
+  msx1.emplid = msxe.emplid
+  AND msxe.email is not null
+  AND msxe.email != coalesce(orx2.other_email, '')
+)
+LEFT OUTER JOIN mssaux1 as msxpa on (
+  msx1.emplid = msxpa.emplid
+  AND NOT EXISTS (
+    SELECT *
+    FROM mssaux3 as msx3
+    WHERE msxpa.emplid = msx3.emplid
+  ) AND msxpa.permanent_street is not null
+  AND msxpa.permanent_city is not null
+  AND (
+    msxpa.permanent_country != coalesce(orx2.home_country, '')
+    OR msxpa.permanent_street != coalesce(orx2.home_street, '')
+    OR msxpa.permanent_city != coalesce(orx2.home_city, '')
+    OR msxpa.permanent_county != coalesce(orx2.home_county, '')
+    OR msxpa.permanent_region != coalesce(orx2.home_state, '')
+    OR msxpa.permanent_postal != coalesce(orx2.home_postal, '')
   )
 )
-AND NOT EXISTS (
+LEFT OUTER JOIN mssaux1 as msxma on (
+  msx1.emplid = msxma.emplid
+  AND msxma.mailing_street is not null
+  AND msxma.mailing_city is not null
+  AND (
+    msxma.mailing_country != coalesce(orx2.mail_country, '')
+    OR msxma.mailing_street != coalesce(orx2.mail_street, '')
+    OR msxma.mailing_city != coalesce(orx2.mail_city, '')
+    OR msxma.mailing_county != coalesce(orx2.mail_county, '')
+    OR msxma.mailing_region != coalesce(orx2.mail_state, '')
+    OR msxma.mailing_postal != coalesce(orx2.mail_postal, '')
+  )
+)
+WHERE NOT EXISTS (
   SELECT *
   FROM mssaux2 as msx2
   WHERE msx1.emplid = msx2.emplid
+) AND (
+  msxpn.emplid is not null
+  OR msxpp.emplid is not null
+  OR msxmp.emplid is not null
+  OR msxe.emplid is not null
+  OR msxpa.emplid is not null
+  OR msxma.emplid is not null
 )
 ORDER BY 1"""

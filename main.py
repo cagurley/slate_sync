@@ -2,14 +2,11 @@
 Main module
 """
 
-from tempfile import TemporaryFile
-import csv
 import cx_Oracle as cxo
 import datetime as dt
 import json
 import os
 import pyodbc
-import re
 import shutil
 import sqlite3
 import func
@@ -115,7 +112,7 @@ def main():
                                 database=connop['sqlserver']['database'],
                                 uid=connop['sqlserver']['user'],
                                 pwd=connop['sqlserver']['password']) as conn:
-                print(conn.getinfo(pyodbc.SQL_DRIVER_VER))
+                print(f'Connected to SQL Server database, driver version: {conn.getinfo(pyodbc.SQL_DRIVER_VER)}\n')
                 with conn.cursor() as cur:
                     cur.execute(stmt.qi_msb)
                     fc = 0
@@ -160,7 +157,7 @@ def main():
                              cxo.makedsn(connop['oracle']['host'],
                                          connop['oracle']['port'],
                                          service_name=connop['oracle']['service_name'])) as conn:
-                print(conn.version)
+                print(f'Connected to Oracle database, driver version: {conn.version}\n')
                 with conn.cursor() as cur:
                     cur.execute(stmt.qi_orb, qvars['oracle'])
                     fc = 0

@@ -173,9 +173,9 @@ from [application] as a
 inner join [person] as p on a.[person] = p.[id]
 inner join [lookup.round] as lr on a.[round] = lr.[id]
 inner join [lookup.period] as lp on lr.[period] = lp.[id]
-left outer join [address] as pad on a.[person] = pad.[record] and pad.[type] = 'permanent' and pad.[rank] = 1
+left outer join [address] as pad on a.[person] = pad.[record] and pad.[type] = 'permanent' and pad.[rank] = 1 and pad.[country] in ('US', 'CA')
 left outer join world.dbo.[country] as padw on pad.[country] = padw.[id]
-left outer join [address] as mad on a.[person] = mad.[record] and mad.[type] is null and mad.[rank] = 1
+left outer join [address] as mad on a.[person] = mad.[record] and mad.[type] is null and mad.[rank] = 1 and mad.[country] in ('US', 'CA')
 left outer join world.dbo.[country] as madw on mad.[country] = madw.[id]
 where p.[id] not in (select [record] from [tag] where ([tag] in ('test')))
 and lr.[key] != 'GR'
@@ -297,8 +297,8 @@ qi_orx2 = """SELECT DISTINCT
   BB.MIDDLE_NAME,
   BB.LAST_NAME,
   BB.NAME_SUFFIX,
-  C.PHONE AS "HOME_PHONE",
-  D.PHONE AS "CELL_PHONE",
+  REGEXP_REPLACE(C.PHONE, '[/-]') AS "HOME_PHONE",
+  REGEXP_REPLACE(D.PHONE, '[/-]') AS "CELL_PHONE",
   E.PHONE_TYPE AS "PHONE_PREF",
   F.EMAIL_ADDR AS "OTHER_EMAIL",
   G.E_ADDR_TYPE AS "EMAIL_PREF",
@@ -332,13 +332,13 @@ LEFT OUTER JOIN PS_PERSONAL_PHONE D ON A.EMPLID = D.EMPLID AND D.PHONE_TYPE = 'C
 LEFT OUTER JOIN PS_PERSONAL_PHONE E ON A.EMPLID = E.EMPLID AND E.PREF_PHONE_FLAG = 'Y'
 LEFT OUTER JOIN PS_EMAIL_ADDRESSES F ON A.EMPLID = F.EMPLID AND F.E_ADDR_TYPE = 'OTHR'
 LEFT OUTER JOIN PS_EMAIL_ADDRESSES G ON A.EMPLID = G.EMPLID AND G.PREF_EMAIL_FLAG = 'Y'
-LEFT OUTER JOIN PS_ADDRESSES H ON A.EMPLID = H.EMPLID AND H.ADDRESS_TYPE = 'HOME' AND H.EFFDT = (
+LEFT OUTER JOIN PS_ADDRESSES H ON A.EMPLID = H.EMPLID AND H.ADDRESS_TYPE = 'HOME' AND H.COUNTRY IN ('USA', 'CAN') AND H.EFFDT = (
   SELECT MAX(H_ED.EFFDT)
   FROM PS_ADDRESSES H_ED
   WHERE H.EMPLID = H_ED.EMPLID
   AND H.ADDRESS_TYPE = H_ED.ADDRESS_TYPE
 )
-LEFT OUTER JOIN PS_ADDRESSES I ON A.EMPLID = I.EMPLID AND I.ADDRESS_TYPE = 'MAIL' AND I.EFFDT = (
+LEFT OUTER JOIN PS_ADDRESSES I ON A.EMPLID = I.EMPLID AND I.ADDRESS_TYPE = 'MAIL' AND I.COUNTRY IN ('USA', 'CAN') AND I.EFFDT = (
   SELECT MAX(I_ED.EFFDT)
   FROM PS_ADDRESSES I_ED
   WHERE I.EMPLID = I_ED.EMPLID
@@ -694,11 +694,11 @@ INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 INNER JOIN (
   SELECT
     msx2.emplid,
-    group_concat(msx2.column) as nonascii_columns
+    group_concat(msx2.column) as illegal_columns
   FROM (
-SELECT *
-FROM mssaux2
-ORDER BY 1, 2
+    SELECT *
+    FROM mssaux2
+    ORDER BY 1, 2
   ) as msx2
   GROUP BY emplid
   ORDER BY 1

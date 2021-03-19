@@ -142,7 +142,7 @@ def filter_rows_by_val(iterable, index, value):
     return filtered
 
 
-def query_to_csv(filename, cursor, return_indices=None, archivename=None):
+def query_to_csv(filename, cursor, return_indices=None, archivename=None, header=True):
     """
     If archivename is supplied, it should be a path string for
     an "archived" copy of the file.
@@ -150,15 +150,16 @@ def query_to_csv(filename, cursor, return_indices=None, archivename=None):
     return_data = []
     with TemporaryFile('r+', newline='') as tfile:
         twriter = csv.writer(tfile)
-        header = []
+        header_row = []
         should_return = False
         for row in cursor.description:
             if len(row) > 0:
-                header.append(row[0])
-        twriter.writerow(header)
+                header_row.append(row[0])
+        if header:
+            twriter.writerow(header_row)
         if return_indices:
             for index in return_indices:
-                if len(header) >= index:
+                if len(header_row) >= index:
                     should_return = True
 
         counter = 0

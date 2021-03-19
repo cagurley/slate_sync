@@ -377,6 +377,7 @@ def main():
                         input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
 
             # Auxiliary queries
+            ffids = []
             lcur.execute(stmt.q0014)
             counter = 0
             while True:
@@ -386,16 +387,12 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for letter in row[1]:
-                        if ord(letter) > 127:
+                        if not (31 < ord(letter) < 127):
                             ffids.append((row[0], 1))
                             break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
             lcur.execute(stmt.q0015)
             counter = 0
             while True:
@@ -405,18 +402,14 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for num in range(11, 17):
                         if row[num] is not None:
                             for letter in row[num]:
-                                if ord(letter) > 127:
+                                if not (31 < ord(letter) < 127):
                                     ffids.append((row[0], num))
                                     break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
             lcur.execute(stmt.q0016)
             counter = 0
             while True:
@@ -426,18 +419,14 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for num in range(5, 11):
                         if row[num] is not None:
                             for letter in row[num]:
-                                if ord(letter) > 127:
+                                if not (31 < ord(letter) < 127):
                                     ffids.append((row[0], num))
                                     break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
             lcur.execute(stmt.q0017)
             counter = 0
             while True:
@@ -447,16 +436,12 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for letter in row[2]:
-                        if ord(letter) > 127:
+                        if not (31 < ord(letter) < 127):
                             ffids.append((row[0], 2))
                             break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
             lcur.execute(stmt.q0018)
             counter = 0
             while True:
@@ -466,16 +451,12 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for letter in row[3]:
-                        if ord(letter) > 127:
+                        if not (31 < ord(letter) < 127):
                             ffids.append((row[0], 3))
                             break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
             lcur.execute(stmt.q0019)
             counter = 0
             while True:
@@ -485,22 +466,22 @@ def main():
                     break
                 print(f'Fetched and wrote from row {counter * 500 + 1}...')
                 counter += 1
-                # Filter for non-ASCII characters
-                ffids = []
+                # Filter for illegal characters
                 for row in frows:
                     for letter in row[4]:
-                        if ord(letter) > 127:
+                        if not (31 < ord(letter) < 127):
                             ffids.append((row[0], 4))
                             break
-                if ffids:
-                    lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
-                    lconn.commit()
+            if ffids:
+                lcur.executemany('INSERT INTO mssaux2 VALUES (?, ?)', ffids)
+                lconn.commit()
             lcur.execute(stmt.q0049)
-            func.query_to_csv(os.path.join(cwd, 'audit', 'NONASCII_DATA.csv'), lcur)
+            func.query_to_csv(os.path.join(cwd, 'audit', 'ILLEGAL_CHAR_DATA.csv'), lcur)
             lcur.execute(stmt.q0050)
             func.query_to_csv(os.path.join(cwd, 'update', 'BIO_DEMO_CHANGE.csv'),
                                  lcur,
-                                 archivename=os.path.join(cwd, '.archive', 'BIO_DEMO_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))))
+                                 archivename=os.path.join(cwd, '.archive', 'BIO_DEMO_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))),
+                                 header=False)
             if ids:
                 stmt_groups = []
                 excerpt = ''
@@ -523,14 +504,14 @@ def main():
                         input('Ensure that the file or directory is not open or locked, then press any enter to try again.')
 
             # Cleanup local database
-            # lcur.execute('DROP TABLE IF EXISTS orabase')
-            # lcur.execute('DROP TABLE IF EXISTS oraaux1')
-            # lcur.execute('DROP TABLE IF EXISTS oraaux2')
-            # lcur.execute('DROP TABLE IF EXISTS mssbase')
-            # lcur.execute('DROP TABLE IF EXISTS mssaux1')
-            # lcur.execute('DROP TABLE IF EXISTS oraref1')
-            # lcur.execute('DROP TABLE IF EXISTS oraref2')
-            # lcur.execute('DROP TABLE IF EXISTS oraref3')
+            lcur.execute('DROP TABLE IF EXISTS orabase')
+            lcur.execute('DROP TABLE IF EXISTS oraaux1')
+            lcur.execute('DROP TABLE IF EXISTS oraaux2')
+            lcur.execute('DROP TABLE IF EXISTS mssbase')
+            lcur.execute('DROP TABLE IF EXISTS mssaux1')
+            lcur.execute('DROP TABLE IF EXISTS oraref1')
+            lcur.execute('DROP TABLE IF EXISTS oraref2')
+            lcur.execute('DROP TABLE IF EXISTS oraref3')
             lconn.commit()
         except (pyodbc.DatabaseError) as e:
             conn.close()
@@ -541,7 +522,7 @@ def main():
             lconn.rollback()
             lcur.close()
             lconn.close()
-            # os.remove(localdb)
+            os.remove(localdb)
     finally:
         input('Press enter to finish...')
 

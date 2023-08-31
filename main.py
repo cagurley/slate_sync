@@ -2,13 +2,13 @@
 Main module
 """
 
-import cx_Oracle as cxo
 import datetime as dt
 import json
 import os
-import pyodbc
 import shutil
 import sqlite3
+import cx_Oracle as cxo
+import pyodbc
 import func
 import statement as stmt
 
@@ -53,7 +53,7 @@ def main():
             if not os.path.exists(testdir):
                 os.mkdir(testdir)
     except (KeyError, OSError, json.JSONDecodeError) as e:
-        print(str(e))
+        print(repr(e))
     else:
         try:
             lconn = sqlite3.connect(localdb)

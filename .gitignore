@@ -6,6 +6,7 @@
 audit/*
 build/*
 dist/*
+img
 update/*
 *.db
 *.json

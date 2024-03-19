@@ -60,6 +60,18 @@ def main():
 
             # Setup local database
             lcur = lconn.cursor()
+            # !!!
+            """
+            Table name syntax reveals general use of table:
+            
+            ora/ -> "Oracle," will be filled w/data from CSP db
+            mss/ -> "Microsoft SQL Server," will be filled w/data from Slate prod db
+            /base -> "base," will serve as a table representing root data for comparison and update
+            /aux/ -> "auxiliary," will serve as a table representing supplemental data for comparison and update
+            /ref/ -> "reference," will serve as a table representing reference data (regarding "system" tables rather
+                     than "normal" records)
+            """
+            # !!!
             lcur.execute('DROP TABLE IF EXISTS orabase')
             lcur.execute('DROP TABLE IF EXISTS oraaux1')
             lcur.execute('DROP TABLE IF EXISTS oraaux2')
@@ -92,6 +104,15 @@ def main():
             lcur.execute('CREATE INDEX orar2 ON oraref2 (prog_action, prog_reason)')
             lcur.execute('CREATE INDEX orar3 ON oraref3 (prog_status, prog_action)')
             lconn.commit()
+            # !!!
+            """
+            * Sets up all data needed for below tables to represent core PS application logic
+                * Adds 'program actions' without associated 'action reasons' for reference
+                * Adds 'program statuses' with associated 'program actions' with an integer ordering
+                  from bottom of stack to top ("WAPP" cannot come before "APPL" for any application)
+                * https://docs.oracle.com/cd/E56917_01/cs9pbr4/eng/cs/lsad/concept_UnderstandingAdmissionsProgramActionsandStatuses-ab78bf.html#topofpage
+            """
+            # !!!
             lcur.executemany('INSERT INTO oraref2 VALUES (?, ?)', [
                     ('APPL', ' '),
                     ('WAPP', ' '),
@@ -479,6 +500,7 @@ def main():
                                  lcur,
                                  archivename=os.path.join(cwd, '.archive', 'BIO_DEMO_CHANGE_{}.csv'.format(today.strftime('%Y%m%d'))),
                                  header=False)
+            # Generates insert statement for custom record previously used for PS CS/HR sync
             if ids:
                 stmt_groups = []
                 excerpt = ''

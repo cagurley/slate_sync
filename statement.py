@@ -2,6 +2,7 @@
 Statement module
 """
 
+# Create main table for referencing Peoplesoft application data
 ct_orb = """CREATE TABLE orabase (
   emplid text,
   adm_appl_nbr text,
@@ -91,6 +92,7 @@ ct_orx2 = """CREATE TABLE oraaux2 (
   mail_postal text
 )"""
 
+# Create main table for referencing Slate application data
 ct_msb = """CREATE TABLE mssbase (
   emplid text,
   adm_appl_nbr text,
@@ -124,6 +126,19 @@ ct_msx1 = """CREATE TABLE mssaux1 (
   mailing_postal text
 )"""
 
+# !!!
+"""
+* Pulls all application data from Slate for comparison
+* One row per application, fields correspond to PS fields based on projected field names
+* Program and plan `coalesce` are fallbacks for data quality errors during original authorship,
+  should be fine now, use `_pending` fields first (they actually represent the current programs and plans for apps)
+* Where criteria
+    * Attached persons must not be "test" records
+    * Apps must not be identified in the graduate "round"
+    * Apps must be submitted
+    * "Period" must be active (meaning in a cycle currently being broadly worked by Admissions staff)
+"""
+# !!!
 qi_msb = """select
   (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID],
   (select [value] from dbo.getFieldTopTable(a.[id], 'adm_appl_nbr')) as [ADM_APPL_NBR],
@@ -145,6 +160,17 @@ and a.[submitted] is not null
 and lp.[active] = 1
 order by 1, 2"""
 
+# !!!
+"""
+* Pulls bio/demo data editable by students from Slate for comparison
+* One row per distinct field/value combination, fields correspond to PS fields based on projected field names
+* Where criteria
+    * Attached persons must not be "test" records
+    * Apps must not be identified in the graduate "round"
+    * Apps must be submitted
+    * "Period" must be active (meaning in a cycle currently being broadly worked by Admissions staff)
+"""
+# !!!
 qi_msx1 = """select distinct
   (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID],
   p.[preferred] as [PREFERRED],
@@ -183,6 +209,18 @@ and a.[submitted] is not null
 and lp.[active] = 1
 order by 1"""
 
+# !!!
+"""
+* Pulls emplids from Slate for exclusion
+* One row per distinct emplid
+* Where criteria
+    * Attached persons must not be "test" records
+    * Apps must not be identified in the graduate "round"
+    * Apps must be submitted
+    * "Period" must be active (meaning in a cycle currently being broadly worked by Admissions staff)
+    * "Peoplesoft Citizenship Status" must be equal to "Alien Temporary"
+"""
+# !!!
 qi_msx3 = """select distinct
   (select [value] from dbo.getFieldTopTable(p.[id], 'emplid')) as [EMPLID]
 from [application] as a
@@ -202,6 +240,15 @@ and exists (
 )
 order by 1"""
 
+# !!!
+"""
+* Pulls all application data from Peoplesoft for comparison
+* One row per application
+* Where criteria
+    * Admit term must be between terms defined in `~/slate_sync_vars/qvars.json`
+    * Apps must be in an undergraduate academic career
+"""
+# !!!
 qi_orb = """SELECT
   A.EMPLID,
   A.ADM_APPL_NBR,
@@ -218,6 +265,15 @@ WHERE A.ADMIT_TERM BETWEEN :termlb AND :termub
 AND A.ACAD_CAREER = 'UGRD'
 ORDER BY A.EMPLID, A.ADM_APPL_NBR"""
 
+"""
+* Pulls all application program and plan data from Peoplesoft for comparison
+* One row per application
+* Where and join criteria
+    * Admit term must be between terms defined in `~/slate_sync_vars/qvars.json`
+    * Apps must be in an undergraduate academic career
+    * Academic program and plan must have the max EFFDT and EFFSEQ for a given application
+    * Academic plan must also have plan sequence equal to 1
+"""
 qi_orx1 = """SELECT
   A.EMPLID,
   A.ACAD_CAREER,
@@ -289,6 +345,21 @@ AND A.EFFDT = (
 )
 ORDER BY A.EMPLID, A.ADM_APPL_NBR"""
 
+# !!!
+"""
+* Pulls bio/demo data editable by students from Peoplesoft for comparison
+* One row per distinct field/value combination, fields correspond to PS fields based on projected field names
+* Where and join criteria
+    * 'Primary' and 'preferred' name with max EFFDT per type per person pulled
+    * 'Home' and 'cell phone' as well as phone preference per person pulled
+    * 'Other' email as well as emial preference per person pulled
+    * 'Home' and 'mailing' addresses with 'United States' or 'Canada' country with max EFFDT per person per type
+    * Person must not be indicated deceased
+    * Admit term must be between terms defined in `~/slate_sync_vars/qvars.json`
+    * Apps must be in an undergraduate academic career
+    * App must not be matriculated
+"""
+# !!!
 qi_orx2 = """SELECT DISTINCT
   A.EMPLID,
   B.FIRST_NAME AS "PREFERRED_NAME",
@@ -374,6 +445,19 @@ AND NOT EXISTS (
 )
 ORDER BY A.EMPLID"""
 
+# !!!
+"""
+* Pulls valid program/plan combos from PS for reference to audit Slate data
+  and prevent update of PS to invalid combinations
+* Where criteria
+    * 'Effective status' is 'active'
+    * EFFDT is max
+* Unioned subqueries
+    1. 'Plan type' is not 'minor'
+    2. 'Program' does not have a 'faux null' plan association
+    3. 'Plan type' is not 'minor' and does not have a 'faux null' program association
+"""
+# !!!
 qi_orr1 = """SELECT DISTINCT A.ACAD_PROG, B.ACAD_PLAN
 FROM PS_ACAD_PROG_TBL A
 INNER JOIN PS_ACAD_PLAN_TBL B ON A.ACAD_PROG = B.ACAD_PROG AND A.EFF_STATUS = B.EFF_STATUS AND B.EFFDT = (
@@ -419,6 +503,12 @@ AND B.ACAD_PROG = ' '
 AND B.ACAD_PLAN_TYPE <> 'MIN'
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Pulls valid program action and reason combinations from PS for reference to audit Slate data
+  and prevent update of PS to invalid combinations
+"""
+# !!!
 qi_orr2 = """SELECT A.PROG_ACTION, B.PROG_REASON
 FROM PS_ADM_ACTION_TBL A
 INNER JOIN PS_PROG_RSN_TBL B ON A.PROG_ACTION = B.PROG_ACTION AND A.EFF_STATUS = B.EFF_STATUS AND B.EFFDT = (
@@ -429,6 +519,11 @@ INNER JOIN PS_PROG_RSN_TBL B ON A.PROG_ACTION = B.PROG_ACTION AND A.EFF_STATUS =
 )
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Audit Query: Selects Slate apps with program/plan combinations considered invalid in Peoplesoft
+"""
+# !!!
 q0001 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
@@ -440,6 +535,11 @@ WHERE NOT EXISTS (
 )
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Audit Query: Selects Slate apps with program action/action reason combinations considered invalid in Peoplesoft
+"""
+# !!!
 q0002 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
@@ -451,6 +551,12 @@ WHERE NOT EXISTS (
 )
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Audit Query: Selects Slate apps with a 'program action' considered an invalid update
+  based on current 'program action' in Peoplesoft
+"""
+# !!!
 q0003 = """SELECT msb.*, orb.*
 FROM mssbase as msb
 INNER JOIN oraref3 as msborr3 on msb.prog_action = msborr3.prog_action
@@ -460,6 +566,13 @@ WHERE msb.prog_action != orb.prog_action
 AND msborr3.rank <= orborr3.rank
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Audit Query: Selects Slate apps with fields that don't have values matching the equivalent
+  Peoplesoft field values where the application already has a 'program action' in Peoplesoft
+  that indicates that no further updates should be made in Slate
+"""
+# !!!
 q0004 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
@@ -478,7 +591,13 @@ AND (
 )
 ORDER BY 1, 2"""
 
-# Referenced only as part of other queries in this module
+# !!!
+"""
+* Referenced only as part of other queries in this module as a standard exclusion Where subclause
+* Selects a union of the preceding four queries to prevent apps identified in any "audit query"
+  from being selected for updates in Peoplesoft
+"""
+# !!!
 q0005 = """
   SELECT umsb.adm_appl_nbr
   FROM mssbase as umsb
@@ -526,6 +645,19 @@ q0005 = """
   )
 """
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_DATA`
+        * `ADMIT_TYPE`
+        * `ADM_UPDATED_DT`
+        * `ADM_UPDATED_BY`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'admit type' does not match PS
+    * Peoplesoft 'admit type' must not be equal to 'transfer readmit'
+"""
+# !!!
 q0006 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
@@ -533,36 +665,104 @@ WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.admit_type != orb.admi
 AND orb.admit_type != 'XRE'
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_DATA`
+        * `ACADEMIC_LEVEL`
+        * `ADM_UPDATED_DT`
+        * `ADM_UPDATED_BY`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'academic level' does not match PS
+"""
+# !!!
 q0007 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.academic_level != orb.academic_level
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_PROG`
+        * `ADMIT_TERM`
+        * `REQ_TERM`
+    * `PS_ADM_APPL_PLAN`
+        * `REQ_TERM`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'admit term' does not match PS
+"""
+# !!!
 q0008 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.admit_term != orb.admit_term
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_PROG`
+        * `ACAD_PROG`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'academic program' does not match PS
+"""
+# !!!
 q0009 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.acad_prog != orb.acad_prog
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_PLAN`
+        * `ACAD_PLAN`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'academic plan' does not match PS
+"""
+# !!!
 q0010 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.acad_plan != orb.acad_plan
 ORDER BY 1, 2"""
 
+# !!!
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_DATA`
+        * `APPL_FEE_STATUS`
+        * `APPL_FEE_DT`
+        * `ADM_UPDATED_DT`
+        * `ADM_UPDATED_BY`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'application fee status' does not match PS
+"""
+# !!!
 q0011 = """SELECT *
 FROM mssbase as msb
 INNER JOIN orabase as orb on msb.emplid = orb.emplid and msb.adm_appl_nbr = orb.adm_appl_nbr
 WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.appl_fee_status != orb.appl_fee_status
 ORDER BY 1, 2"""
 
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APPL_PROG`
+        * `PROG_REASON`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'program action' matches PS
+    * Slate 'program reason' does not match PS
+"""
+# !!!
 q0012 = """SELECT
   msb.*,
   orb.*,
@@ -603,6 +803,22 @@ WHERE msb.adm_appl_nbr NOT IN (""" + q0005 + """) AND msb.prog_action = orb.prog
 AND msb.prog_reason != orb.prog_reason
 ORDER BY 1, 2"""
 
+"""
+* Selects Slate apps for updating the following tables and fields in Peoplesoft:
+    * `PS_ADM_APP_CAR_SEQ`
+        * `DEP_CALC_NEEDED`
+            * Only for applications with Slate 'program action' equal to 'admit' (filtered in `main.py`)
+        * `CREATE_PROG_STATUS`
+            * Only for applications with Slate 'program action' equal to 'matriculated' (filtered in `main.py`)
+* Selects Slate apps for inserting into the following tables in Peoplesoft:
+    * `PS_ADM_APPL_PROG`
+    * `PS_ADM_APPL_PLAN`
+* Where criteria
+    * Standard exclusion of 'audit records'
+    * Slate 'program action' does not match PS
+    * Slate 'admit term', 'academic program', and 'academic plan' must exist
+"""
+# !!!
 q0013 = """SELECT
   msb.*,
   orb.*,
@@ -656,12 +872,22 @@ AND msb.acad_prog is not null
 AND msb.acad_plan is not null
 ORDER BY 1, 2"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'preferred name' exists
+"""
 q0014 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.preferred is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'mailing address street' and 'mailing address city' exists
+"""
 q0015 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
@@ -669,6 +895,11 @@ WHERE msx1.mailing_street is not null
 AND msx1.mailing_city is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'permanent address street' and 'permanent address city' exists
+"""
 q0016 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
@@ -676,24 +907,44 @@ WHERE msx1.permanent_street is not null
 AND msx1.permanent_city is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'primary phone' exists
+"""
 q0017 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.primary_phone is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'mobile phone' exists
+"""
 q0018 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.mobile_phone is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for comparison of bio/demo data
+* Where criteria
+    * Slate 'email' exists (equivalent to 'other' email in PS)
+"""
 q0019 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
 WHERE msx1.email is not null
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for audit of bio/demo data based on presence of non-ASCII characters
+* Selects from records selected in queries 14-19 where at least one character is present
+  that is not in UTF-8 range [32, 126]
+"""
 q0049 = """SELECT *
 FROM mssaux1 as msx1
 INNER JOIN oraaux2 as orx2 on msx1.emplid = orx2.emplid
@@ -711,6 +962,11 @@ INNER JOIN (
 ) as msx2gc on msx1.emplid = msx2gc.emplid
 ORDER BY 1"""
 
+"""
+* Selects Slate apps for update of bio/demo data through File Parser (triggered manually)
+* Selects apps where at least one Slate bio/demo or contact field value does not match PS equivalent
+* Excludes apps identified in query 49 and those without an 'emplid' in Slate
+"""
 q0050 = """SELECT DISTINCT
   msx1.emplid,
   msxpn.preferred,
